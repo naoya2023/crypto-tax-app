@@ -1062,81 +1062,257 @@ Phantomが検出されませんでした。
             return transactions;
         }
 
-        // Solana取引履歴取得
+        // Solana取引履歴取得（修正版）
         async function fetchSolanaTransactions(address, apiKey) {
             const transactions = [];
             
             try {
-                // Solscan APIを使用
-                const url = `https://public-api.solscan.io/account/transactions?account=${address}&limit=100`;
+                // Solscan APIの新しいエンドポイント
+                // 注: Solscan APIは頻繁に変更されるため、複数の方法を試す
                 
-                const response = await axios.get(url, {
-                    headers: {
-                        'Accept': 'application/json',
-                        'token': apiKey
+                // 方法1: 新しいAPIエンドポイント
+                let url = `https://api.solscan.io/account/transactions?address=${address}&limit=100`;
+                
+                console.log('Fetching from Solscan:', url);
+                
+                try {
+                    const response = await axios.get(url, {
+                        headers: {
+                            'Accept': 'application/json',
+                            'User-Agent': 'Mozilla/5.0'
+                        }
+                    });
+                    
+                    if (response.data && response.data.data) {
+                        return processSolscanData(response.data.data, address);
+                    }
+                } catch (error) {
+                    console.log('Method 1 failed, trying alternative...');
+                }
+                
+                // 方法2: 代替エンドポイント（トークンなし）
+                url = `https://api.solscan.io/account/transaction?address=${address}`;
+                
+                try {
+                    const response = await axios.get(url);
+                    if (response.data) {
+                        return processSolscanData(response.data, address);
+                    }
+                } catch (error) {
+                    console.log('Method 2 failed, trying RPC method...');
+                }
+                
+                // 方法3: Solana RPC を直接使用
+                console.log('Using Solana RPC method...');
+                const rpcUrl = 'https://api.mainnet-beta.solana.com';
+                
+                // Solana Web3.js を使用した取引履歴取得
+                const connection = new solanaWeb3.Connection(rpcUrl, 'confirmed');
+                const publicKey = new solanaWeb3.PublicKey(address);
+                
+                // 最近の署名を取得
+                const signatures = await connection.getSignaturesForAddress(publicKey, {
+                    limit: 100
+                });
+                
+                console.log(`Found ${signatures.length} transactions via RPC`);
+                
+                // 各トランザクションの詳細を取得
+                for (const signatureInfo of signatures) {
+                    try {
+                        const tx = await connection.getTransaction(signatureInfo.signature, {
+                            maxSupportedTransactionVersion: 0
+                        });
+                        
+                        if (tx) {
+                            // トランザクションを解析
+                            const parsed = parseRPCTransaction(tx, address, signatureInfo);
+                            if (parsed) {
+                                transactions.push(parsed);
+                            }
+                        }
+                    } catch (txError) {
+                        console.warn('Failed to fetch transaction:', signatureInfo.signature);
+                    }
+                }
+                
+                // 価格情報を取得して更新
+                const currentPrice = await getCurrentSOLPrice();
+                transactions.forEach(tx => {
+                    if (!tx.price) {
+                        tx.price = currentPrice;
+                        tx.totalJPY = tx.amount * currentPrice;
                     }
                 });
                 
-                if (response.data && response.data.data) {
-                    for (const tx of response.data.data) {
-                        // SOL転送の場合
-                        if (tx.solTransfers && tx.solTransfers.length > 0) {
-                            for (const transfer of tx.solTransfers) {
-                                const amount = parseFloat(transfer.amount) / 1e9; // lamports to SOL
-                                const type = transfer.destination === address ? 'buy' : 'sell';
-                                
-                                if (amount > 0) {
-                                    transactions.push({
-                                        date: new Date(tx.blockTime * 1000).toISOString().split('T')[0],
-                                        type: type,
-                                        currency: 'SOL',
-                                        amount: amount,
-                                        price: 15000, // 実際にはCoinGecko APIで取得
-                                        totalJPY: amount * 15000,
-                                        fee: (tx.fee || 0) / 1e9 * 15000,
-                                        hash: tx.txHash
-                                    });
-                                }
-                            }
-                        }
+                return transactions;
+                
+            } catch (error) {
+                console.error('Solana transaction fetch error:', error);
+                
+                // エラーメッセージを改善
+                if (error.message.includes('429')) {
+                    throw new Error('API利用制限に達しました。しばらく待ってから再試行してください。');
+                } else if (error.message.includes('Invalid address')) {
+                    throw new Error('無効なSolanaアドレスです。');
+                } else {
+                    throw new Error('取引履歴の取得に失敗しました。手動でCSVをインポートすることもできます。');
+                }
+            }
+        }
+        
+        // Solscanデータの処理
+        function processSolscanData(data, address) {
+            const transactions = [];
+            const dataArray = Array.isArray(data) ? data : [data];
+            
+            for (const tx of dataArray) {
+                // SOL転送の場合
+                if (tx.solTransfers && tx.solTransfers.length > 0) {
+                    for (const transfer of tx.solTransfers) {
+                        const amount = parseFloat(transfer.amount) / 1e9; // lamports to SOL
+                        const type = transfer.destination === address ? 'buy' : 'sell';
                         
-                        // SPLトークンの場合
-                        if (tx.tokenTransfers && tx.tokenTransfers.length > 0) {
-                            for (const transfer of tx.tokenTransfers) {
-                                const amount = parseFloat(transfer.amount) / Math.pow(10, transfer.decimals || 9);
-                                const type = transfer.destination === address ? 'buy' : 'sell';
-                                
-                                if (amount > 0) {
-                                    transactions.push({
-                                        date: new Date(tx.blockTime * 1000).toISOString().split('T')[0],
-                                        type: type,
-                                        currency: transfer.symbol || 'UNKNOWN',
-                                        amount: amount,
-                                        price: 100, // 実際にはトークンごとの価格が必要
-                                        totalJPY: amount * 100,
-                                        fee: 0,
-                                        hash: tx.txHash
-                                    });
-                                }
-                            }
+                        if (amount > 0) {
+                            transactions.push({
+                                date: new Date(tx.blockTime * 1000).toISOString().split('T')[0],
+                                type: type,
+                                currency: 'SOL',
+                                amount: amount,
+                                price: 15000, // デフォルト価格
+                                totalJPY: amount * 15000,
+                                fee: (tx.fee || 0) / 1e9 * 15000,
+                                hash: tx.txHash || tx.signature
+                            });
                         }
                     }
                 }
                 
-            } catch (error) {
-                console.error('Solscan API Error:', error);
-                
-                // APIエラーの場合は代替方法を試す
-                if (error.response && error.response.status === 401) {
-                    throw new Error('Solscan APIキーが無効です');
-                } else if (error.response && error.response.status === 429) {
-                    throw new Error('API利用制限に達しました');
-                } else {
-                    throw new Error('Solscan APIエラー: ' + error.message);
+                // SPLトークンの場合
+                if (tx.tokenTransfers && tx.tokenTransfers.length > 0) {
+                    for (const transfer of tx.tokenTransfers) {
+                        const amount = parseFloat(transfer.amount) / Math.pow(10, transfer.decimals || 9);
+                        const type = transfer.destination === address ? 'buy' : 'sell';
+                        
+                        if (amount > 0) {
+                            transactions.push({
+                                date: new Date(tx.blockTime * 1000).toISOString().split('T')[0],
+                                type: type,
+                                currency: transfer.symbol || 'UNKNOWN',
+                                amount: amount,
+                                price: 100,
+                                totalJPY: amount * 100,
+                                fee: 0,
+                                hash: tx.txHash || tx.signature
+                            });
+                        }
+                    }
                 }
             }
             
             return transactions;
+        }
+        
+        // RPC トランザクションの解析
+        function parseRPCTransaction(tx, address, signatureInfo) {
+            try {
+                const date = new Date(tx.blockTime * 1000).toISOString().split('T')[0];
+                const fee = tx.meta.fee / 1e9; // lamports to SOL
+                
+                // 残高の変化を確認
+                const accountIndex = tx.transaction.message.accountKeys.findIndex(
+                    key => key.toBase58() === address
+                );
+                
+                if (accountIndex >= 0 && tx.meta.postBalances && tx.meta.preBalances) {
+                    const preBalance = tx.meta.preBalances[accountIndex] / 1e9;
+                    const postBalance = tx.meta.postBalances[accountIndex] / 1e9;
+                    const change = postBalance - preBalance;
+                    
+                    if (Math.abs(change) > 0.000001) { // 小さな変化は無視
+                        return {
+                            date: date,
+                            type: change > 0 ? 'buy' : 'sell',
+                            currency: 'SOL',
+                            amount: Math.abs(change),
+                            price: 15000, // デフォルト価格
+                            totalJPY: Math.abs(change) * 15000,
+                            fee: fee * 15000,
+                            hash: signatureInfo.signature
+                        };
+                    }
+                }
+            } catch (error) {
+                console.warn('Failed to parse transaction:', error);
+            }
+            
+            return null;
+        }
+        
+        // 現在のSOL価格を取得
+        async function getCurrentSOLPrice() {
+            try {
+                const response = await axios.get(
+                    'https://api.coingecko.com/api/v3/simple/price?ids=solana&vs_currencies=jpy'
+                );
+                return response.data.solana.jpy || 15000;
+            } catch (error) {
+                console.warn('Failed to fetch SOL price, using default');
+                return 15000; // デフォルト価格
+            }
+        }
+        
+        // Solana Web3.js の簡易実装（CDNから読み込めない場合用）
+        if (typeof solanaWeb3 === 'undefined') {
+            window.solanaWeb3 = {
+                Connection: class {
+                    constructor(endpoint) {
+                        this.endpoint = endpoint;
+                    }
+                    
+                    async getSignaturesForAddress(publicKey, options) {
+                        const response = await fetch(this.endpoint, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                jsonrpc: '2.0',
+                                id: 1,
+                                method: 'getSignaturesForAddress',
+                                params: [publicKey.toString(), options]
+                            })
+                        });
+                        const data = await response.json();
+                        return data.result || [];
+                    }
+                    
+                    async getTransaction(signature) {
+                        const response = await fetch(this.endpoint, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                jsonrpc: '2.0',
+                                id: 1,
+                                method: 'getTransaction',
+                                params: [signature, { encoding: 'json', maxSupportedTransactionVersion: 0 }]
+                            })
+                        });
+                        const data = await response.json();
+                        return data.result;
+                    }
+                },
+                
+                PublicKey: class {
+                    constructor(key) {
+                        this.key = key;
+                    }
+                    toString() {
+                        return this.key;
+                    }
+                    toBase58() {
+                        return this.key;
+                    }
+                }
+            };
         }
 
         // 価格データ取得（CoinGecko API）
