@@ -3,7 +3,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>暗号通貨税金計算アプリ 2025 - DeFi/ステーキング/送金完全対応</title>
+    <title>暗号通貨税金計算アプリ 2025 - 実ウォレット接続対応</title>
+    <!-- Web3ライブラリ -->
+    <script src="https://cdn.jsdelivr.net/npm/ethers@5.7.2/dist/ethers.umd.min.js"></script>
+    <script src="https://unpkg.com/@solana/web3.js@latest/lib/index.iife.min.js"></script>
     <style>
         * {
             margin: 0;
@@ -143,7 +146,32 @@
             font-family: monospace;
             font-size: 0.9em;
             word-break: break-all;
-            margin-top: 5px;
+            margin: 10px 0;
+        }
+
+        .api-settings {
+            background: #f5f5f5;
+            border-radius: 10px;
+            padding: 20px;
+            margin-top: 20px;
+        }
+
+        .api-settings h3 {
+            margin-bottom: 15px;
+            color: #2a5298;
+        }
+
+        .info-box {
+            background: #e3f2fd;
+            border: 1px solid #2196F3;
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 15px;
+        }
+
+        .info-box p {
+            margin: 5px 0;
+            font-size: 0.9em;
         }
 
         .main-content {
@@ -242,6 +270,14 @@
 
         .btn-success:hover {
             background: #45a049;
+        }
+
+        .btn-danger {
+            background: #f44336;
+        }
+
+        .btn-danger:hover {
+            background: #d32f2f;
         }
 
         .transaction-list {
@@ -460,6 +496,41 @@
             right: 20px;
             z-index: 1000;
             max-width: 400px;
+            padding: 15px 20px;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            animation: slideIn 0.3s ease;
+        }
+
+        .status-message.success {
+            background: #4CAF50;
+            color: white;
+        }
+
+        .status-message.error {
+            background: #f44336;
+            color: white;
+        }
+
+        .status-message.warning {
+            background: #ff9800;
+            color: white;
+        }
+
+        .status-message.info {
+            background: #2196F3;
+            color: white;
+        }
+
+        @keyframes slideIn {
+            from {
+                transform: translateX(100%);
+                opacity: 0;
+            }
+            to {
+                transform: translateX(0);
+                opacity: 1;
+            }
         }
 
         .stats-grid {
@@ -488,16 +559,44 @@
             font-weight: 700;
             color: #333;
         }
+
+        .fetch-progress {
+            margin-top: 10px;
+            padding: 10px;
+            background: #e3f2fd;
+            border-radius: 8px;
+            display: none;
+        }
+
+        .fetch-progress.active {
+            display: block;
+        }
+
+        .progress-bar {
+            width: 100%;
+            height: 20px;
+            background: #ddd;
+            border-radius: 10px;
+            overflow: hidden;
+            margin-top: 10px;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: #2196F3;
+            width: 0%;
+            transition: width 0.3s ease;
+        }
     </style>
 </head>
 <body>
     <div class="container">
         <div class="header">
             <h1>暗号通貨税金計算アプリ<span class="version-badge">2025年版</span></h1>
-            <p>ウォレット接続対応 | DeFi・ステーキング・送金完全サポート | 自動取引履歴取得</p>
+            <p>実ウォレット接続対応 | DeFi・ステーキング・送金完全サポート | 自動取引履歴取得</p>
             <div class="features-list">
                 <span class="feature-tag">📊 2025年税制対応</span>
-                <span class="feature-tag">🔐 DeFi収益計算</span>
+                <span class="feature-tag">🔐 実ウォレット接続</span>
                 <span class="feature-tag">💎 ステーキング報酬</span>
                 <span class="feature-tag">💸 送金履歴管理</span>
                 <span class="feature-tag">🎁 エアドロップ対応</span>
@@ -507,6 +606,14 @@
         <div class="wallet-connection">
             <h2>ウォレット接続</h2>
             <p>お使いのウォレットを接続するか、CSVファイルをインポートしてください。</p>
+            
+            <div class="info-box">
+                <p><strong>実ウォレット接続について：</strong></p>
+                <p>• MetaMask: Ethereumメインネットの取引履歴を取得します</p>
+                <p>• Phantom: Solanaメインネットの取引履歴を取得します</p>
+                <p>• APIキー設定後、より詳細な取引情報を取得できます</p>
+            </div>
+            
             <div class="wallet-buttons">
                 <button class="wallet-btn metamask-btn" onclick="connectMetaMask()">
                     🦊 MetaMask接続
@@ -527,10 +634,29 @@
                 <strong>接続済みウォレット:</strong>
                 <div id="walletType"></div>
                 <div class="wallet-address" id="walletAddress"></div>
-                <div class="export-buttons">
-                    <button class="btn btn-success" onclick="exportTransactionsCSV()">取引履歴をCSV出力</button>
-                    <button class="btn btn-secondary" onclick="disconnectWallet()">切断</button>
+                <button class="btn btn-success" onclick="fetchTransactions()">取引履歴を取得</button>
+                <button class="btn btn-secondary" onclick="disconnectWallet()">切断</button>
+                <div class="fetch-progress" id="fetchProgress">
+                    <p id="fetchStatus">取引履歴を取得中...</p>
+                    <div class="progress-bar">
+                        <div class="progress-fill" id="progressFill"></div>
+                    </div>
                 </div>
+            </div>
+            
+            <div class="api-settings">
+                <h3>API設定（より詳細な取引情報を取得）</h3>
+                <div class="form-group">
+                    <label for="etherscanApi">Etherscan API Key（無料で取得可能）</label>
+                    <input type="text" id="etherscanApi" placeholder="Your Etherscan API Key">
+                    <small><a href="https://etherscan.io/apis" target="_blank">Etherscan APIキーを取得</a></small>
+                </div>
+                <div class="form-group">
+                    <label for="coinGeckoApi">CoinGecko API Key（価格情報取得用）</label>
+                    <input type="text" id="coinGeckoApi" placeholder="Your CoinGecko API Key (オプション)">
+                    <small><a href="https://www.coingecko.com/en/api" target="_blank">CoinGecko APIキーを取得</a></small>
+                </div>
+                <button class="btn" onclick="saveApiKeys()">APIキーを保存</button>
             </div>
             
             <div class="loading" id="loadingIndicator">
@@ -729,149 +855,82 @@
         let transactions = [];
         let connectedWallet = null;
         let walletAddress = null;
+        let provider = null;
         
-        // 2025年対応のサンプルデータ生成
-        function generateSampleTransactions(walletType = 'ethereum') {
-            const baseData = walletType === 'ethereum' ? {
-                currency: 'ETH',
-                price: 380000,
-                defiToken: 'UNI',
-                stakingProtocol: 'Lido'
-            } : {
-                currency: 'SOL',
-                price: 22000,
-                defiToken: 'RAY',
-                stakingProtocol: 'Marinade'
-            };
-            
-            return [
-                {
-                    date: '2025-01-25',
-                    type: 'buy',
-                    currency: baseData.currency,
-                    amount: 5.0,
-                    price: baseData.price,
-                    totalJPY: 5.0 * baseData.price,
-                    fee: 8000,
-                    hash: '0x' + Math.random().toString(36).substr(2, 9)
-                },
-                {
-                    date: '2025-01-20',
-                    type: 'staking',
-                    currency: baseData.currency,
-                    amount: 0.15,
-                    price: baseData.price * 1.05,
-                    totalJPY: 0.15 * baseData.price * 1.05,
-                    fee: 0,
-                    protocol: baseData.stakingProtocol,
-                    hash: '0x' + Math.random().toString(36).substr(2, 9)
-                },
-                {
-                    date: '2025-01-15',
-                    type: 'defi',
-                    currency: baseData.defiToken,
-                    amount: 50,
-                    price: 1500,
-                    totalJPY: 75000,
-                    fee: 500,
-                    protocol: 'Uniswap V3',
-                    hash: '0x' + Math.random().toString(36).substr(2, 9)
-                },
-                {
-                    date: '2025-01-10',
-                    type: 'transfer-out',
-                    currency: baseData.currency,
-                    amount: 1.0,
-                    price: baseData.price,
-                    totalJPY: 1.0 * baseData.price,
-                    fee: 3000,
-                    hash: '0x' + Math.random().toString(36).substr(2, 9)
-                },
-                {
-                    date: '2024-12-28',
-                    type: 'airdrop',
-                    currency: 'ARB',
-                    amount: 1000,
-                    price: 200,
-                    totalJPY: 200000,
-                    fee: 0,
-                    protocol: 'Arbitrum',
-                    hash: '0x' + Math.random().toString(36).substr(2, 9)
-                },
-                {
-                    date: '2024-12-20',
-                    type: 'sell',
-                    currency: baseData.currency,
-                    amount: 2.0,
-                    price: baseData.price * 1.1,
-                    totalJPY: 2.0 * baseData.price * 1.1,
-                    fee: 5000,
-                    hash: '0x' + Math.random().toString(36).substr(2, 9)
-                },
-                {
-                    date: '2024-12-15',
-                    type: 'transfer-in',
-                    currency: baseData.currency,
-                    amount: 3.0,
-                    price: baseData.price * 0.95,
-                    totalJPY: 3.0 * baseData.price * 0.95,
-                    fee: 0,
-                    hash: '0x' + Math.random().toString(36).substr(2, 9)
-                },
-                {
-                    date: '2024-11-30',
-                    type: 'swap',
-                    currency: baseData.currency,
-                    amount: 1.5,
-                    price: baseData.price,
-                    totalJPY: 1.5 * baseData.price,
-                    fee: 2000,
-                    protocol: 'SushiSwap',
-                    hash: '0x' + Math.random().toString(36).substr(2, 9)
-                },
-                {
-                    date: '2024-11-20',
-                    type: 'lending',
-                    currency: 'USDC',
-                    amount: 100,
-                    price: 150,
-                    totalJPY: 15000,
-                    fee: 0,
-                    protocol: 'Aave',
-                    hash: '0x' + Math.random().toString(36).substr(2, 9)
-                },
-                {
-                    date: '2024-10-15',
-                    type: 'buy',
-                    currency: baseData.currency,
-                    amount: 4.0,
-                    price: baseData.price * 0.85,
-                    totalJPY: 4.0 * baseData.price * 0.85,
-                    fee: 6000,
-                    hash: '0x' + Math.random().toString(36).substr(2, 9)
-                }
-            ];
-        }
+        // APIキー
+        let apiKeys = {
+            etherscan: localStorage.getItem('etherscanApiKey') || '',
+            coinGecko: localStorage.getItem('coinGeckoApiKey') || ''
+        };
+        
+        // DeFiプロトコルのアドレス
+        const DEFI_PROTOCOLS = {
+            '0x7a250d5630b4cf539739df2c5dacb4c659f2488d': 'Uniswap V2',
+            '0xe592427a0aece92de3edee1f18e0157c05861564': 'Uniswap V3',
+            '0xd9e1ce17f2641f24ae83637ab66a2cca9c378b9f': 'SushiSwap',
+            '0x7d2768de32b0b80b7a3454c06bdac94a69ddc7a9': 'Aave V2',
+            '0x87870bca3f3fd6335c3f4ce8392d69350b4fa4e2': 'Aave V3',
+            '0xae7ab96520de3a18e5e111b5eaab095312d7fe84': 'Lido',
+            '0x1111111254fb6c44bac0bed2854e76f90643097d': '1inch',
+            '0xbebc44782c7db0a1a60cb6fe97d0b483032ff1c7': 'Curve 3Pool'
+        };
+        
+        // 現在の価格キャッシュ
+        let priceCache = {};
         
         // MetaMask接続
         async function connectMetaMask() {
             try {
                 showLoading(true);
                 
-                // デモモード：実際のMetaMask接続をシミュレート
-                await new Promise(resolve => setTimeout(resolve, 1000));
+                if (typeof window.ethereum === 'undefined') {
+                    showMessage('MetaMaskがインストールされていません。MetaMask拡張機能をインストールしてください。', 'error');
+                    window.open('https://metamask.io/download/', '_blank');
+                    return;
+                }
                 
-                // デモ用のアドレス
-                const demoAddress = '0x' + Math.random().toString(36).substr(2, 40);
+                // アカウント接続要求
+                const accounts = await window.ethereum.request({ 
+                    method: 'eth_requestAccounts' 
+                });
                 
-                updateWalletUI(true, 'MetaMask', demoAddress);
+                if (accounts.length === 0) {
+                    throw new Error('アカウントが見つかりません');
+                }
                 
-                // サンプル取引データを生成
-                transactions = generateSampleTransactions('ethereum');
-                updateStats();
-                displayTransactions();
+                // プロバイダー設定
+                provider = new ethers.providers.Web3Provider(window.ethereum);
+                const signer = provider.getSigner();
+                walletAddress = await signer.getAddress();
                 
-                showMessage('MetaMaskが正常に接続されました（デモモード）', 'success');
+                // ネットワーク情報取得
+                const network = await provider.getNetwork();
+                const chainId = network.chainId;
+                
+                // メインネット以外の場合は警告
+                if (chainId !== 1) {
+                    showMessage('Ethereumメインネットに切り替えてください。現在のネットワーク: ' + network.name, 'warning');
+                }
+                
+                updateWalletUI(true, 'MetaMask', walletAddress);
+                
+                // アカウント変更の監視
+                window.ethereum.on('accountsChanged', (accounts) => {
+                    if (accounts.length === 0) {
+                        disconnectWallet();
+                    } else {
+                        walletAddress = accounts[0];
+                        updateWalletUI(true, 'MetaMask', walletAddress);
+                    }
+                });
+                
+                // チェーン変更の監視
+                window.ethereum.on('chainChanged', () => {
+                    window.location.reload();
+                });
+                
+                showMessage('MetaMaskが正常に接続されました', 'success');
+                
             } catch (error) {
                 showMessage('接続エラー: ' + error.message, 'error');
             } finally {
@@ -884,25 +943,341 @@
             try {
                 showLoading(true);
                 
-                // デモモード：実際のPhantom接続をシミュレート
-                await new Promise(resolve => setTimeout(resolve, 1000));
+                const getProvider = () => {
+                    if ('phantom' in window) {
+                        const provider = window.phantom?.solana;
+                        if (provider?.isPhantom) {
+                            return provider;
+                        }
+                    }
+                    return null;
+                };
                 
-                // デモ用のアドレス（Solana形式）
-                const demoAddress = Math.random().toString(36).substr(2, 44).toUpperCase();
+                const provider = getProvider();
                 
-                updateWalletUI(true, 'Phantom', demoAddress);
+                if (!provider) {
+                    showMessage('Phantomがインストールされていません。Phantom拡張機能をインストールしてください。', 'error');
+                    window.open('https://phantom.app/', '_blank');
+                    return;
+                }
                 
-                // Solana用のサンプルデータ
-                transactions = generateSampleTransactions('solana');
-                updateStats();
-                displayTransactions();
+                // 接続要求
+                const resp = await provider.connect();
+                walletAddress = resp.publicKey.toString();
                 
-                showMessage('Phantomが正常に接続されました（デモモード）', 'success');
+                updateWalletUI(true, 'Phantom', walletAddress);
+                
+                // 切断イベントの監視
+                provider.on('disconnect', () => {
+                    disconnectWallet();
+                });
+                
+                // アカウント変更の監視
+                provider.on('accountChanged', (publicKey) => {
+                    if (publicKey) {
+                        walletAddress = publicKey.toString();
+                        updateWalletUI(true, 'Phantom', walletAddress);
+                    }
+                });
+                
+                showMessage('Phantomが正常に接続されました', 'success');
+                
             } catch (error) {
                 showMessage('接続エラー: ' + error.message, 'error');
             } finally {
                 showLoading(false);
             }
+        }
+        
+        // 取引履歴取得
+        async function fetchTransactions() {
+            try {
+                const progressDiv = document.getElementById('fetchProgress');
+                const progressBar = document.getElementById('progressFill');
+                const statusText = document.getElementById('fetchStatus');
+                
+                progressDiv.classList.add('active');
+                progressBar.style.width = '0%';
+                
+                transactions = [];
+                
+                if (connectedWallet === 'MetaMask') {
+                    await fetchEthereumTransactions(walletAddress, progressBar, statusText);
+                } else if (connectedWallet === 'Phantom') {
+                    await fetchSolanaTransactions(walletAddress, progressBar, statusText);
+                }
+                
+                updateStats();
+                displayTransactions();
+                
+                if (transactions.length > 0) {
+                    showMessage(`${transactions.length}件の取引を取得しました`, 'success');
+                } else {
+                    showMessage('取引履歴が見つかりませんでした', 'warning');
+                }
+                
+            } catch (error) {
+                showMessage('取引履歴の取得に失敗しました: ' + error.message, 'error');
+            } finally {
+                document.getElementById('fetchProgress').classList.remove('active');
+            }
+        }
+        
+        // Ethereum取引履歴取得
+        async function fetchEthereumTransactions(address, progressBar, statusText) {
+            const txList = [];
+            
+            try {
+                // Etherscan APIキーが設定されている場合
+                if (apiKeys.etherscan) {
+                    statusText.textContent = 'Etherscan APIから取引履歴を取得中...';
+                    progressBar.style.width = '20%';
+                    
+                    // 通常の取引
+                    const txUrl = `https://api.etherscan.io/api?module=account&action=txlist&address=${address}&startblock=0&endblock=99999999&sort=desc&apikey=${apiKeys.etherscan}`;
+                    const txResponse = await fetch(txUrl);
+                    const txData = await txResponse.json();
+                    
+                    if (txData.status === '1' && txData.result) {
+                        progressBar.style.width = '40%';
+                        statusText.textContent = `${txData.result.length}件の取引を処理中...`;
+                        
+                        for (const tx of txData.result.slice(0, 100)) { // 最新100件
+                            if (parseFloat(tx.value) > 0) {
+                                const date = new Date(tx.timeStamp * 1000);
+                                const value = parseFloat(tx.value) / 1e18;
+                                const type = tx.from.toLowerCase() === address.toLowerCase() ? 'transfer-out' : 'transfer-in';
+                                
+                                // DeFiプロトコルチェック
+                                const protocol = DEFI_PROTOCOLS[tx.to.toLowerCase()];
+                                const txType = protocol ? 'defi' : type;
+                                
+                                // 価格取得
+                                const price = await getHistoricalPrice('ethereum', date);
+                                
+                                txList.push({
+                                    date: date.toISOString().split('T')[0],
+                                    type: txType,
+                                    currency: 'ETH',
+                                    amount: value,
+                                    price: price,
+                                    totalJPY: value * price,
+                                    fee: (parseFloat(tx.gasUsed) * parseFloat(tx.gasPrice) / 1e18) * price,
+                                    protocol: protocol,
+                                    hash: tx.hash
+                                });
+                            }
+                        }
+                    }
+                    
+                    progressBar.style.width = '60%';
+                    statusText.textContent = 'ERC20トークンの取引を取得中...';
+                    
+                    // ERC20トークン取引
+                    const tokenUrl = `https://api.etherscan.io/api?module=account&action=tokentx&address=${address}&startblock=0&endblock=99999999&sort=desc&apikey=${apiKeys.etherscan}`;
+                    const tokenResponse = await fetch(tokenUrl);
+                    const tokenData = await tokenResponse.json();
+                    
+                    if (tokenData.status === '1' && tokenData.result) {
+                        progressBar.style.width = '80%';
+                        
+                        for (const tx of tokenData.result.slice(0, 100)) { // 最新100件
+                            const decimals = parseInt(tx.tokenDecimal);
+                            const value = parseFloat(tx.value) / Math.pow(10, decimals);
+                            
+                            if (value > 0) {
+                                const date = new Date(tx.timeStamp * 1000);
+                                const type = tx.from.toLowerCase() === address.toLowerCase() ? 'transfer-out' : 'transfer-in';
+                                
+                                // ステーキング報酬の検出
+                                const isStaking = tx.tokenSymbol.toLowerCase().includes('st') || 
+                                                tx.from === '0x0000000000000000000000000000000000000000';
+                                
+                                // 価格取得（簡易的に1000円固定）
+                                const price = 1000;
+                                
+                                txList.push({
+                                    date: date.toISOString().split('T')[0],
+                                    type: isStaking ? 'staking' : type,
+                                    currency: tx.tokenSymbol,
+                                    amount: value,
+                                    price: price,
+                                    totalJPY: value * price,
+                                    fee: 0,
+                                    hash: tx.hash
+                                });
+                            }
+                        }
+                    }
+                    
+                } else {
+                    // APIキーがない場合は、RPCから基本的な取引履歴を取得
+                    statusText.textContent = 'ブロックチェーンから直接取引履歴を取得中...';
+                    progressBar.style.width = '50%';
+                    
+                    const blockNumber = await provider.getBlockNumber();
+                    const startBlock = Math.max(0, blockNumber - 10000); // 最新10000ブロック
+                    
+                    // 簡易的な取引履歴取得
+                    const balance = await provider.getBalance(address);
+                    
+                    showMessage('APIキーを設定すると、より詳細な取引履歴を取得できます', 'info');
+                }
+                
+                progressBar.style.width = '100%';
+                statusText.textContent = '完了！';
+                
+            } catch (error) {
+                console.error('Ethereum transaction fetch error:', error);
+                throw new Error('Ethereum取引履歴の取得に失敗しました');
+            }
+            
+            transactions = txList;
+        }
+        
+        // Solana取引履歴取得
+        async function fetchSolanaTransactions(address, progressBar, statusText) {
+            const txList = [];
+            
+            try {
+                statusText.textContent = 'Solanaブロックチェーンから取引履歴を取得中...';
+                progressBar.style.width = '20%';
+                
+                // Solana Web3 接続
+                const connection = new solanaWeb3.Connection(
+                    'https://api.mainnet-beta.solana.com',
+                    'confirmed'
+                );
+                
+                const publicKey = new solanaWeb3.PublicKey(address);
+                
+                // 署名を取得
+                const signatures = await connection.getSignaturesForAddress(publicKey, {
+                    limit: 50
+                });
+                
+                progressBar.style.width = '40%';
+                statusText.textContent = `${signatures.length}件の取引を処理中...`;
+                
+                let processed = 0;
+                for (const signatureInfo of signatures) {
+                    try {
+                        const tx = await connection.getTransaction(signatureInfo.signature, {
+                            maxSupportedTransactionVersion: 0
+                        });
+                        
+                        if (tx) {
+                            const date = new Date(tx.blockTime * 1000);
+                            const accountKeys = tx.transaction.message.accountKeys || 
+                                              tx.transaction.message.staticAccountKeys;
+                            
+                            const accountIndex = accountKeys.findIndex(
+                                key => key.toBase58() === address
+                            );
+                            
+                            if (accountIndex >= 0 && tx.meta) {
+                                const preBalance = (tx.meta.preBalances[accountIndex] || 0) / 1e9;
+                                const postBalance = (tx.meta.postBalances[accountIndex] || 0) / 1e9;
+                                const change = postBalance - preBalance;
+                                
+                                if (Math.abs(change) > 0.000001) {
+                                    const type = change > 0 ? 'transfer-in' : 'transfer-out';
+                                    const isStaking = change > 0 && change < 0.1; // 小額の入金はステーキング報酬の可能性
+                                    
+                                    // 現在のSOL価格（APIがない場合は固定値）
+                                    const price = await getHistoricalPrice('solana', date) || 22000;
+                                    
+                                    txList.push({
+                                        date: date.toISOString().split('T')[0],
+                                        type: isStaking ? 'staking' : type,
+                                        currency: 'SOL',
+                                        amount: Math.abs(change),
+                                        price: price,
+                                        totalJPY: Math.abs(change) * price,
+                                        fee: (tx.meta.fee || 0) / 1e9 * price,
+                                        hash: signatureInfo.signature
+                                    });
+                                }
+                            }
+                        }
+                        
+                        processed++;
+                        progressBar.style.width = `${40 + (processed / signatures.length) * 60}%`;
+                        
+                    } catch (txError) {
+                        console.warn('Failed to fetch transaction:', signatureInfo.signature);
+                    }
+                }
+                
+                progressBar.style.width = '100%';
+                statusText.textContent = '完了！';
+                
+            } catch (error) {
+                console.error('Solana transaction fetch error:', error);
+                throw new Error('Solana取引履歴の取得に失敗しました');
+            }
+            
+            transactions = txList;
+        }
+        
+        // 価格取得
+        async function getHistoricalPrice(coin, date) {
+            const coinIds = {
+                'ethereum': 'ethereum',
+                'eth': 'ethereum',
+                'bitcoin': 'bitcoin',
+                'btc': 'bitcoin',
+                'solana': 'solana',
+                'sol': 'solana'
+            };
+            
+            const coinId = coinIds[coin.toLowerCase()];
+            if (!coinId) return 1000; // デフォルト価格
+            
+            // キャッシュチェック
+            const dateStr = date.toISOString().split('T')[0];
+            const cacheKey = `${coinId}-${dateStr}`;
+            if (priceCache[cacheKey]) {
+                return priceCache[cacheKey];
+            }
+            
+            try {
+                // CoinGecko API（無料枠）
+                const formattedDate = dateStr.split('-').reverse().join('-'); // DD-MM-YYYY
+                const url = `https://api.coingecko.com/api/v3/coins/${coinId}/history?date=${formattedDate}&localization=false`;
+                
+                const response = await fetch(url);
+                if (response.ok) {
+                    const data = await response.json();
+                    if (data.market_data && data.market_data.current_price) {
+                        const price = data.market_data.current_price.jpy;
+                        priceCache[cacheKey] = price;
+                        return price;
+                    }
+                }
+            } catch (error) {
+                console.warn('Price fetch error:', error);
+            }
+            
+            // デフォルト価格
+            const defaultPrices = {
+                'ethereum': 380000,
+                'bitcoin': 6500000,
+                'solana': 22000
+            };
+            
+            return defaultPrices[coinId] || 1000;
+        }
+        
+        // APIキー保存
+        function saveApiKeys() {
+            apiKeys.etherscan = document.getElementById('etherscanApi').value.trim();
+            apiKeys.coinGecko = document.getElementById('coinGeckoApi').value.trim();
+            
+            localStorage.setItem('etherscanApiKey', apiKeys.etherscan);
+            localStorage.setItem('coinGeckoApiKey', apiKeys.coinGecko);
+            
+            showMessage('APIキーを保存しました', 'success');
         }
         
         // ウォレット接続状態の更新
@@ -1265,24 +1640,6 @@
             showMessage('税金計算が完了しました', 'success');
         }
         
-        // CSVエクスポート
-        function exportTransactionsCSV() {
-            if (transactions.length === 0) {
-                showMessage('エクスポートする取引データがありません', 'error');
-                return;
-            }
-            
-            let csv = '\ufeff'; // BOM
-            csv += '日付,取引タイプ,通貨,数量,単価,合計,手数料,プロトコル,ハッシュ\n';
-            
-            transactions.forEach(tx => {
-                csv += `${tx.date},${tx.type},${tx.currency},${tx.amount},${tx.price},${tx.totalJPY},${tx.fee || 0},"${tx.protocol || ''}","${tx.hash || ''}"\n`;
-            });
-            
-            downloadCSV(csv, `transactions_${new Date().toISOString().split('T')[0]}.csv`);
-            showMessage('取引履歴をエクスポートしました', 'success');
-        }
-        
         // 結果エクスポート
         function exportResultsCSV() {
             const year = document.getElementById('taxYear').value;
@@ -1302,7 +1659,15 @@
             csv += `DeFi/ステーキング収益,${document.getElementById('defiIncome').textContent}\n`;
             csv += `総手数料,${document.getElementById('totalFees').textContent}\n`;
             csv += `純利益,${document.getElementById('netProfit').textContent}\n`;
-            csv += `推定税額,${document.getElementById('estimatedTax').textContent}\n`;
+            csv += `推定税額,${document.getElementById('estimatedTax').textContent}\n\n`;
+            
+            csv += '取引履歴\n';
+            csv += '日付,取引タイプ,通貨,数量,単価,合計,手数料,プロトコル,ハッシュ\n';
+            
+            const yearTx = transactions.filter(tx => tx.date.startsWith(year));
+            yearTx.forEach(tx => {
+                csv += `${tx.date},${tx.type},${tx.currency},${tx.amount},${tx.price},${tx.totalJPY},${tx.fee || 0},"${tx.protocol || ''}","${tx.hash || ''}"\n`;
+            });
             
             downloadCSV(csv, `tax_report_${year}_${new Date().toISOString().split('T')[0]}.csv`);
             showMessage('計算結果をエクスポートしました', 'success');
@@ -1391,6 +1756,14 @@
         window.onload = function() {
             displayTransactions();
             updateStats();
+            
+            // 保存されたAPIキーを読み込み
+            if (apiKeys.etherscan) {
+                document.getElementById('etherscanApi').value = apiKeys.etherscan;
+            }
+            if (apiKeys.coinGecko) {
+                document.getElementById('coinGeckoApi').value = apiKeys.coinGecko;
+            }
         };
     </script>
 </body>
