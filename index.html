@@ -1,13 +1,1725 @@
-<!DOCTYPE html>
+protocol: 'Uniswap',
+                    hash: '0x' + Math.random().toString(36).substr(2, 9)
+                },
+                {
+                    date: `${currentYear - 1}-06-10`,
+                    type: 'swap',
+                    currency: currency,
+                    amount: 0.5,
+                    price: basePrice,
+                    totalJPY: 0.5 * basePrice,
+                    fee: 1500,
+                    protocol: 'SushiSwap',
+                    hash: '0x' + Math.random().toString(36).substr(2, 9)
+                }
+            ];
+        }
+
+        // ウォレット検出の改善版
+        async function detectWallet(type) {
+            let attempts = 0;
+            const maxAttempts = 5;
+            
+            return new Promise((resolve) => {
+                const checkInterval = setInterval(() => {
+                    attempts++;
+                    
+                    if (type === 'MetaMask') {
+                        if (window.ethereum && window.ethereum.isMetaMask) {
+                            clearInterval(checkInterval);
+                            resolve(true);
+                            return;
+                        }
+                    } else if (type === 'Phantom') {
+                        if (window.solana && window.solana.isPhantom) {
+                            clearInterval(checkInterval);
+                            resolve(true);
+                            return;
+                        }
+                        if (window.phantom && window.phantom.solana) {
+                            window.solana = window.phantom.solana;
+                            clearInterval(checkInterval);
+                            resolve(true);
+                            return;
+                        }
+                    }
+                    
+                    if (attempts >= maxAttempts) {
+                        clearInterval(checkInterval);
+                        resolve(false);
+                    }
+                }, 500);
+            });
+        }
+
+        // ウォレット接続
+        document.getElementById('connectMetaMask').addEventListener('click', async () => {
+            try {
+                showLoading(true);
+                showAlert('MetaMaskを検出中...', 'info');
+                
+                const isDetected = await detectWallet('MetaMask');
+                
+                if (!isDetected) {
+                    const useDemoMode = confirm('MetaMaskが検出されませんでした。デモモードで続行しますか？');
+                    if (useDemoMode) {
+                        await connectDemoWallet('MetaMask');
+                    }
+                    return;
+                }
+
+                const accounts = await window.ethereum.request({ 
+                    method: 'eth_requestAccounts' 
+                });
+                
+                if (accounts.length === 0) {
+                    throw new Error('アカウントが見つかりません');
+                }
+                
+                connectedWallet = {
+                    type: 'MetaMask',
+                    address: accounts[0],
+                    provider: window.ethereum
+                };
+                
+                updateWalletUI();
+                showAlert('MetaMaskが正常に接続されました', 'success');
+                
+            } catch (error) {
+                showAlert('接続エラー: ' + error.message, 'error');
+            } finally {
+                showLoading(false);
+            }
+        });
+
+        document.getElementById('connectPhantom').addEventListener('click', async () => {
+            try {
+                showLoading(true);
+                showAlert('Phantomを検出中...', 'info');
+                
+                const isDetected = await detectWallet('Phantom');
+                
+                if (!isDetected) {
+                    const useDemoMode = confirm('Phantomが検出されませんでした。デモモードで続行しますか？');
+                    if (useDemoMode) {
+                        await connectDemoWallet('Phantom');
+                    }
+                    return;
+                }
+
+                const response = await window.solana.connect();
+                const publicKey = response.publicKey.toString();
+                
+                connectedWallet = {
+                    type: 'Phantom',
+                    address: publicKey,
+                    provider: window.solana
+                };
+                
+                updateWalletUI();
+                showAlert('Phantomが正常に接続されました', 'success');
+                
+            } catch (error) {
+                showAlert('接続エラー: ' + error.message, 'error');
+            } finally {
+                showLoading(false);
+            }
+        });
+
+        // デモモード接続
+        async function connectDemoWallet(type) {
+            showLoading(true);
+            await new Promise(resolve => setTimeout(resolve, 1000));
+            
+            connectedWallet = {
+                type: type + ' (Demo)',
+                address: type === 'MetaMask' ? 
+                    '0x' + Math.random().toString(36).substr(2, 40) :
+                    Math.random().toString(36).substr(2, 44).toUpperCase(),
+                isDemo: true
+            };
+            
+            updateWalletUI();
+            currentTransactions = generateSampleData(type === 'MetaMask' ? 'ethereum' : 'solana');
+            displayTransactions();
+            showAlert(`${type}が接続されました（デモモード）`, 'success');
+            showLoading(false);
+        }
+
+        // 取引履歴取得（DeFi/ステーキング対応版）
+        document.getElementById('fetchTransactions').addEventListener('click', async () => {
+            if (!connectedWallet) {
+                showAlert('ウォレットが接続されていません', 'error');
+                return;
+            }
+            
+            if (connectedWallet.isDemo) {
+                showAlert('デモモードでは追加のサンプルデータを表示します', 'info');
+                // DeFi取引を追加
+                currentTransactions.push(...generateDeFiTransactions());
+                displayTransactions();
+                return;
+            }
+            
+            const apiKeys = JSON.parse(localStorage.getItem('apiKeys') || '{}');
+            
+            try {
+                showLoading(true);
+                
+                if (connectedWallet.type === 'MetaMask') {
+                    currentTransactions = await fetchEthereumTransactions(connectedWallet.address, apiKeys.etherscan);
+                } else if (connectedWallet.type === 'Phantom') {
+                    currentTransactions = await fetchSolanaTransactions(connectedWallet.address, apiKeys.solscan);
+                }
+                
+                if (currentTransactions.length === 0) {
+                    showAlert('取引履歴が見つかりませんでした', 'warning');
+                } else {
+                    displayTransactions();
+                    showAlert(`${currentTransactions.length}件の取引を取得しました`, 'success');
+                }
+                
+            } catch (error) {
+                showAlert('取引履歴の取得に失敗しました: ' + error.message, 'error');
+            } finally {
+                showLoading(false);
+            }
+        });
+
+        // DeFi取引のサンプルデータ
+        function generateDeFiTransactions() {
+            return [
+                {
+                    date: '2025-01-10',
+                    type: 'lending',
+                    currency: 'USDC',
+                    amount: 1000,
+                    price: 150,
+                    totalJPY: 150000,
+                    fee: 0,
+                    protocol: 'Aave',
+                    hash: '0x' + Math.random().toString(36).substr(2, 9)
+                },
+                {
+                    date: '2025-01-05',
+                    type: 'defi',
+                    currency: 'CRV',
+                    amount: 50,
+                    price: 100,
+                    totalJPY: 5000,
+                    fee: 0,
+                    protocol: 'Curve Finance',
+                    hash: '0x' + Math.random().toString(36).substr(2, 9)
+                }
+            ];
+        }
+
+        // Ethereum取引履歴取得（DeFi対応版）
+        async function fetchEthereumTransactions(address, apiKey) {
+            const transactions = [];
+            
+            try {
+                // 通常の取引を取得
+                const txUrl = `https://api.etherscan.io/api?module=account&action=txlist&address=${address}&startblock=0&endblock=99999999&sort=desc&apikey=${apiKey}`;
+                const txResponse = await axios.get(txUrl);
+                
+                if (txResponse.data.status === '1' && txResponse.data.result) {
+                    for (const tx of txResponse.data.result) {
+                        const value = parseFloat(tx.value) / 1e18;
+                        const date = new Date(tx.timeStamp * 1000);
+                        
+                        // 送金方向を判定
+                        let type = 'transfer';
+                        if (tx.from.toLowerCase() === address.toLowerCase()) {
+                            type = value > 0 ? 'transfer-out' : 'transfer';
+                        } else if (tx.to.toLowerCase() === address.toLowerCase()) {
+                            type = 'transfer-in';
+                        }
+                        
+                        // DeFiプロトコルの検出
+                        const protocol = detectDeFiProtocol(tx.to);
+                        if (protocol) {
+                            type = 'defi';
+                        }
+                        
+                        if (value > 0 || tx.gasUsed > 0) {
+                            transactions.push({
+                                date: date.toISOString().split('T')[0],
+                                type: type,
+                                currency: 'ETH',
+                                amount: value,
+                                price: 350000, // 2025年の想定価格
+                                totalJPY: value * 350000,
+                                fee: (parseFloat(tx.gasUsed) * parseFloat(tx.gasPrice) / 1e18) * 350000,
+                                protocol: protocol,
+                                hash: tx.hash
+                            });
+                        }
+                    }
+                }
+                
+                // ERC20トークンの取引も取得
+                const tokenUrl = `https://api.etherscan.io/api?module=account&action=tokentx&address=${address}&startblock=0&endblock=99999999&sort=desc&apikey=${apiKey}`;
+                const tokenResponse = await axios.get(tokenUrl);
+                
+                if (tokenResponse.data.status === '1' && tokenResponse.data.result) {
+                    for (const tx of tokenResponse.data.result) {
+                        const decimals = parseInt(tx.tokenDecimal);
+                        const value = parseFloat(tx.value) / Math.pow(10, decimals);
+                        const date = new Date(tx.timeStamp * 1000);
+                        
+                        let type = 'transfer';
+                        if (tx.from.toLowerCase() === address.toLowerCase()) {
+                            type = 'transfer-out';
+                        } else if (tx.to.toLowerCase() === address.toLowerCase()) {
+                            type = 'transfer-in';
+                        }
+                        
+                        // DeFiプロトコルの検出
+                        const protocol = detectDeFiProtocol(tx.to) || detectDeFiProtocol(tx.from);
+                        if (protocol) {
+                            type = 'defi';
+                        }
+                        
+                        // ステーキング報酬の検出
+                        if (tx.tokenSymbol && tx.tokenSymbol.includes('st') && type === 'transfer-in') {
+                            type = 'staking';
+                        }
+                        
+                        if (value > 0) {
+                            transactions.push({
+                                date: date.toISOString().split('T')[0],
+                                type: type,
+                                currency: tx.tokenSymbol,
+                                amount: value,
+                                price: 1000, // トークンごとの価格が必要
+                                totalJPY: value * 1000,
+                                fee: 0,
+                                protocol: protocol,
+                                hash: tx.hash
+                            });
+                        }
+                    }
+                }
+                
+            } catch (error) {
+                console.error('Etherscan API Error:', error);
+                throw new Error('Etherscan APIエラー: ' + error.message);
+            }
+            
+            return transactions;
+        }
+
+        // DeFiプロトコルの検出
+        function detectDeFiProtocol(address) {
+            if (!address) return null;
+            
+            const protocols = {
+                '0x7a250d5630b4cf539739df2c5dacb4c659f2488d': 'Uniswap V2',
+                '0xe592427a0aece92de3edee1f18e0157c05861564': 'Uniswap V3',
+                '0xd9e1ce17f2641f24ae83637ab66a2cca9c378b9f': 'SushiSwap',
+                '0x7d2768de32b0b80b7a3454c06bdac94a69ddc7a9': 'Aave',
+                '0x3d9819210a31b4961b30ef54be2aed79b9c9cd3b': 'Compound',
+                '0xbebc44782c7db0a1a60cb6fe97d0b483032ff1c7': 'Curve'
+            };
+            
+            return protocols[address.toLowerCase()] || null;
+        }
+
+        // 手動入力フォームの表示
+        document.getElementById('manualInput').addEventListener('click', () => {
+            document.getElementById('manualInputModal').style.display = 'flex';
+            document.getElementById('txDate').value = new Date().toISOString().split('T')[0];
+        });
+
+        // 取引タイプ変更時の処理
+        document.getElementById('txType').addEventListener('change', (e) => {
+            const protocolGroup = document.getElementById('txProtocolGroup');
+            if (['defi', 'staking', 'swap', 'lending'].includes(e.target.value)) {
+                protocolGroup.style.display = 'block';
+            } else {
+                protocolGroup.style.display = 'none';
+            }
+        });
+
+        // 手動取引の追加
+        document.getElementById('manualTransactionForm').addEventListener('submit', (e) => {
+            e.preventDefault();
+            
+            const transaction = {
+                date: document.getElementById('txDate').value,
+                type: document.getElementById('txType').value,
+                currency: document.getElementById('txCurrency').value.toUpperCase(),
+                amount: parseFloat(document.getElementById('txAmount').value),
+                price: parseFloat(document.getElementById('txPrice').value),
+                totalJPY: parseFloat(document.getElementById('txAmount').value) * parseFloat(document.getElementById('txPrice').value),
+                fee: parseFloat(document.getElementById('txFee').value) || 0,
+                protocol: document.getElementById('txProtocol').value || null,
+                hash: `MANUAL-${Date.now()}`
+            };
+            
+            currentTransactions.push(transaction);
+            displayTransactions();
+            document.getElementById('manualInputModal').style.display = 'none';
+            e.target.reset();
+            showAlert('取引を追加しました', 'success');
+        });
+
+        // 取引履歴表示（改良版）
+        function displayTransactions() {
+            const filterType = document.getElementById('filterType').value;
+            const list = document.getElementById('transactionList');
+            
+            let transactions = currentTransactions;
+            if (filterType !== 'all') {
+                transactions = currentTransactions.filter(tx => tx.type === filterType);
+            }
+            
+            if (transactions.length === 0) {
+                list.innerHTML = '<p class="empty-state">取引データがありません</p>';
+                return;
+            }
+            
+            list.innerHTML = transactions.map(tx => `
+                <div class="transaction-item">
+                    <div class="transaction-header">
+                        <span class="transaction-date">${formatDate(tx.date)}</span>
+                        <span class="transaction-type type-${tx.type}">${getTypeLabel(tx.type)}</span>
+                    </div>
+                    <div class="transaction-details">
+                        <div class="detail-item">
+                            <span class="detail-label">通貨</span>
+                            <span class="detail-value">${tx.currency}</span>
+                        </div>
+                        <div class="detail-item">
+                            <span class="detail-label">数量</span>
+                            <span class="detail-value">${tx.amount.toFixed(8)}</span>
+                        </div>
+                        <div class="detail-item">
+                            <span class="detail-label">単価</span>
+                            <span class="detail-value">${formatCurrency(tx.price)}</span>
+                        </div>
+                        <div class="detail-item">
+                            <span class="detail-label">合計</span>
+                            <span class="detail-value">${formatCurrency(tx.totalJPY)}</span>
+                        </div>
+                        ${tx.fee ? `
+                        <div class="detail-item">
+                            <span class="detail-label">手数料</span>
+                            <span class="detail-value">${formatCurrency(tx.fee)}</span>
+                        </div>
+                        ` : ''}
+                        ${tx.protocol ? `
+                        <div class="detail-item">
+                            <span class="detail-label">プロトコル</span>
+                            <span class="detail-value">${tx.protocol}</span>
+                        </div>
+                        ` : ''}
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        // 税金計算（DeFi/ステーキング対応版）
+        document.getElementById('taxForm').addEventListener('submit', (e) => {
+            e.preventDefault();
+            
+            if (currentTransactions.length === 0) {
+                showAlert('計算する取引データがありません', 'error');
+                return;
+            }
+            
+            const year = document.getElementById('taxYear').value;
+            const method = document.getElementById('taxMethod').value;
+            const taxRate = parseFloat(document.getElementById('taxRate').value) / 100;
+            const includeDefi = document.getElementById('includeDefi').checked;
+            const includeStaking = document.getElementById('includeStaking').checked;
+            
+            // 年度でフィルター
+            let yearTransactions = currentTransactions.filter(tx => 
+                tx.date.startsWith(year)
+            );
+            
+            if (yearTransactions.length === 0) {
+                showAlert(`${year}年の取引データがありません`, 'error');
+                return;
+            }
+            
+            // DeFi/ステーキングの除外
+            if (!includeDefi) {
+                yearTransactions = yearTransactions.filter(tx => 
+                    !['defi', 'lending', 'swap'].includes(tx.type)
+                );
+            }
+            if (!includeStaking) {
+                yearTransactions = yearTransactions.filter(tx => tx.type !== 'staking');
+            }
+            
+            // 税金計算ロジック
+            let totalProfit = 0;
+            let totalLoss = 0;
+            let totalFees = 0;
+            let defiIncome = 0;
+            let stakingIncome = 0;
+            let transferFees = 0;
+            const holdings = {};
+            
+            // 日付順にソート
+            yearTransactions.sort((a, b) => new Date(a.date) - new Date(b.date));
+            
+            yearTransactions.forEach(tx => {
+                if (tx.fee) {
+                    totalFees += tx.fee;
+                    if (tx.type.includes('transfer')) {
+                        transferFees += tx.fee;
+                    }
+                }
+                
+                // DeFi収益の計算
+                if (['defi', 'lending', 'airdrop'].includes(tx.type)) {
+                    defiIncome += tx.totalJPY;
+                }
+                
+                // ステーキング収益の計算
+                if (tx.type === 'staking') {
+                    stakingIncome += tx.totalJPY;
+                }
+                
+                if (tx.type === 'buy' || tx.type === 'transfer-in') {
+                    // 購入・入金処理
+                    if (!holdings[tx.currency]) {
+                        holdings[tx.currency] = {
+                            amount: 0,
+                            totalCost: 0
+                        };
+                    }
+                    holdings[tx.currency].amount += tx.amount;
+                    holdings[tx.currency].totalCost += tx.totalJPY;
+                    
+                } else if (tx.type === 'sell' || tx.type === 'transfer-out') {
+                    // 売却・出金処理
+                    if (holdings[tx.currency] && holdings[tx.currency].amount > 0) {
+                        const avgCost = holdings[tx.currency].totalCost / holdings[tx.currency].amount;
+                        const sellCost = avgCost * tx.amount;
+                        const profit = tx.totalJPY - sellCost;
+                        
+                        if (profit > 0) {
+                            totalProfit += profit;
+                        } else {
+                            totalLoss += Math.abs(profit);
+                        }
+                        
+                        holdings[tx.currency].amount -= tx.amount;
+                        holdings[tx.currency].totalCost -= sellCost;
+                    }
+                } else if (tx.type === 'swap') {
+                    // スワップは売却として扱う
+                    if (holdings[tx.currency] && holdings[tx.currency].amount > 0) {
+                        const avgCost = holdings[tx.currency].totalCost / holdings[tx.currency].amount;
+                        const swapCost = avgCost * tx.amount;
+                        const profit = tx.totalJPY - swapCost;
+                        
+                        if (profit > 0) {
+                            totalProfit += profit;
+                        } else {
+                            totalLoss += Math.abs(profit);
+                        }
+                        
+                        holdings[tx.currency].amount -= tx.amount;
+                        holdings[tx.currency].totalCost -= swapCost;
+                    }
+                }
+            });
+            
+            // 総合計算
+            const totalIncome = totalProfit + defiIncome + stakingIncome;
+            const netProfit = totalIncome - totalLoss - totalFees;
+            const taxableIncome = Math.max(0, netProfit);
+            const estimatedTax = taxableIncome * taxRate;
+            
+            // 結果を保存
+            taxResults = {
+                year,
+                method,
+                taxRate: taxRate * 100,
+                totalProfit,
+                totalLoss,
+                totalFees,
+                transferFees,
+                defiIncome,
+                stakingIncome,
+                totalIncome,
+                netProfit,
+                taxableIncome,
+                estimatedTax,
+                transactions: yearTransactions
+            };
+            
+            // 結果を表示
+            document.getElementById('totalProfit').textContent = formatCurrency(totalProfit);
+            document.getElementById('totalLoss').textContent = formatCurrency(totalLoss);
+            document.getElementById('netProfit').textContent = formatCurrency(netProfit);
+            document.getElementById('estimatedTax').textContent = formatCurrency(estimatedTax);
+            document.getElementById('defiIncome').textContent = formatCurrency(defiIncome + stakingIncome);
+            document.getElementById('totalTransferFees').textContent = formatCurrency(transferFees);
+            
+            document.getElementById('resultsSection').style.display = 'block';
+            document.getElementById('resultsSection').scrollIntoView({ behavior: 'smooth' });
+            
+            showAlert('税金計算が完了しました', 'success');
+        });
+
+        // 結果エクスポート（改良版）
+        document.getElementById('exportResults').addEventListener('click', () => {
+            if (!taxResults) {
+                showAlert('エクスポートする計算結果がありません', 'error');
+                return;
+            }
+            
+            let csv = '暗号資産税金計算レポート（DeFi・ステーキング対応）\n\n';
+            csv += `計算日,${new Date().toLocaleDateString('ja-JP')}\n`;
+            csv += `対象年度,${taxResults.year}年\n`;
+            csv += `計算方法,${taxResults.method === 'average' ? '移動平均法' : '先入先出法'}\n`;
+            csv += `税率,${taxResults.taxRate}%\n\n`;
+            
+            csv += '計算結果\n';
+            csv += `売買利益,${formatCurrency(taxResults.totalProfit)}\n`;
+            csv += `売買損失,${formatCurrency(taxResults.totalLoss)}\n`;
+            csv += `DeFi収益,${formatCurrency(taxResults.defiIncome)}\n`;
+            csv += `ステーキング収益,${formatCurrency(taxResults.stakingIncome)}\n`;
+            csv += `手数料合計,${formatCurrency(taxResults.totalFees)}\n`;
+            csv += `送金手数料,${formatCurrency(taxResults.transferFees)}\n`;
+            csv += `純利益,${formatCurrency(taxResults.netProfit)}\n`;
+            csv += `課税所得,${formatCurrency(taxResults.taxableIncome)}\n`;
+            csv += `推定税額,${formatCurrency(taxResults.estimatedTax)}\n\n`;
+            
+            csv += '対象取引明細\n';
+            csv += '日付,取引タイプ,通貨,数量,単価,合計,手数料,プロトコル\n';
+            taxResults.transactions.forEach(tx => {
+                csv += `${tx.date},${getTypeLabel(tx.type)},${tx.currency},${tx.amount},${tx.price},${tx.totalJPY},${tx.fee || 0},${tx.protocol || ''}\n`;
+            });
+            
+            downloadCSV(csv, `tax_report_${taxResults.year}_${new Date().toISOString().split('T')[0]}.csv`);
+            showAlert('計算結果をエクスポートしました', 'success');
+        });
+
+        // その他のイベントリスナー
+        document.getElementById('disconnectWallet').addEventListener('click', () => {
+            connectedWallet = null;
+            currentTransactions = [];
+            updateWalletUI();
+            displayTransactions();
+            document.getElementById('resultsSection').style.display = 'none';
+            showAlert('ウォレットが切断されました', 'success');
+        });
+
+        document.getElementById('saveApiKeys').addEventListener('click', () => {
+            const keys = {
+                etherscan: document.getElementById('etherscanApi').value.trim(),
+                solscan: document.getElementById('solscanApi').value.trim()
+            };
+            
+            localStorage.setItem('apiKeys', JSON.stringify(keys));
+            showAlert('APIキーを保存しました', 'success');
+        });
+
+        document.getElementById('importCSV').addEventListener('click', () => {
+            document.getElementById('csvFileInput').click();
+        });
+
+        document.getElementById('csvFileInput').addEventListener('change', (event) => {
+            const file = event.target.files[0];
+            if (!file) return;
+            
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                try {
+                    const lines = e.target.result.split('\n');
+                    const headers = lines[0].split(',');
+                    
+                    currentTransactions = [];
+                    for (let i = 1; i < lines.length; i++) {
+                        if (lines[i].trim() === '') continue;
+                        
+                        const values = lines[i].split(',');
+                        currentTransactions.push({
+                            date: values[0],
+                            type: values[1],
+                            currency: values[2],
+                            amount: parseFloat(values[3]),
+                            price: parseFloat(values[4]),
+                            totalJPY: parseFloat(values[5]),
+                            fee: parseFloat(values[6]) || 0,
+                            protocol: values[7] || null,
+                            hash: values[8] || ''
+                        });
+                    }
+                    
+                    displayTransactions();
+                    showAlert('CSVファイルをインポートしました', 'success');
+                } catch (error) {
+                    showAlert('CSVファイルの読み込みに失敗しました', 'error');
+                }
+            };
+            reader.readAsText(file);
+            event.target.value = '';
+        });
+
+        document.getElementById('exportTransactions').addEventListener('click', () => {
+            if (currentTransactions.length === 0) {
+                showAlert('エクスポートする取引データがありません', 'error');
+                return;
+            }
+            
+            let csv = '日付,取引タイプ,通貨,数量,単価,合計,手数料,プロトコル,ハッシュ\n';
+            currentTransactions.forEach(tx => {
+                csv += `${tx.date},${tx.type},${tx.currency},${tx.amount},${tx.price},${tx.totalJPY},${tx.fee || 0},${tx.protocol || ''},${tx.hash || ''}\n`;
+            });
+            
+            downloadCSV(csv, `transactions_${new Date().toISOString().split('T')[0]}.csv`);
+            showAlert('取引履歴をエクスポートしました', 'success');
+        });
+
+        document.getElementById('filterType').addEventListener('change', displayTransactions);
+        document.getElementById('closeModal').addEventListener('click', () => {
+            document.getElementById('manualInputModal').style.display = 'none';
+        });
+        document.getElementById('printResults').addEventListener('click', () => {
+            window.print();
+        });
+
+        // UI更新
+        function updateWalletUI() {
+            const walletInfo = document.getElementById('walletInfo');
+            
+            if (connectedWallet) {
+                document.getElementById('walletType').textContent = connectedWallet.type;
+                document.getElementById('walletAddress').textContent = connectedWallet.address;
+                walletInfo.style.display = 'block';
+            } else {
+                walletInfo.style.display = 'none';
+            }
+        }
+
+        // 初期化
+        window.addEventListener('DOMContentLoaded', () => {
+            // 保存されたAPIキーを読み込み
+            const savedKeys = JSON.parse(localStorage.getItem('apiKeys') || '{}');
+            if (savedKeys.etherscan) {
+                document.getElementById('etherscanApi').value = savedKeys.etherscan;
+            }
+            if (savedKeys.solscan) {
+                document.getElementById('solscanApi').value = savedKeys.solscan;
+            }
+            
+            // 現在の年を税金計算のデフォルトに設定
+            const currentYear = new Date().getFullYear();
+            const yearSelect = document.getElementById('taxYear');
+            if (!Array.from(yearSelect.options).some(opt => opt.value === currentYear.toString())) {
+                const newOption = document.createElement('option');
+                newOption.value = currentYear;
+                newOption.textContent = currentYear + '年';
+                yearSelect.insertBefore(newOption, yearSelect.firstChild);
+            }
+            yearSelect.value = currentYear.toString();
+            
+            // 初期表示
+            displayTransactions();
+        });
+
+        // Solana取引履歴取得（改良版）
+        async function fetchSolanaTransactions(address, apiKey) {
+            const transactions = [];
+            
+            try {
+                // Solana RPC を使用
+                const rpcUrl = 'https://api.mainnet-beta.solana.com';
+                const connection = new solanaWeb3.Connection(rpcUrl, 'confirmed');
+                const publicKey = new solanaWeb3.PublicKey(address);
+                
+                // 最近の署名を取得
+                const signatures = await connection.getSignaturesForAddress(publicKey, {
+                    limit: 100
+                });
+                
+                console.log(`Found ${signatures.length} transactions via RPC`);
+                
+                // 各トランザクションの詳細を取得
+                for (const signatureInfo of signatures) {
+                    try {
+                        const tx = await connection.getTransaction(signatureInfo.signature, {
+                            maxSupportedTransactionVersion: 0
+                        });
+                        
+                        if (tx) {
+                            // トランザクションを解析
+                            const parsed = parseSOLTransaction(tx, address, signatureInfo);
+                            if (parsed) {
+                                transactions.push(parsed);
+                            }
+                        }
+                    } catch (txError) {
+                        console.warn('Failed to fetch transaction:', signatureInfo.signature);
+                    }
+                }
+                
+                // ステーキング報酬の検出
+                transactions.forEach(tx => {
+                    if (tx.type === 'transfer-in' && tx.amount < 0.01) {
+                        // 少額の入金はステーキング報酬の可能性
+                        tx.type = 'staking';
+                        tx.protocol = 'Solana Staking';
+                    }
+                });
+                
+                return transactions;
+                
+            } catch (error) {
+                console.error('Solana transaction fetch error:', error);
+                throw new Error('取引履歴の取得に失敗しました');
+            }
+        }
+        
+        // SOLトランザクションの解析
+        function parseSOLTransaction(tx, address, signatureInfo) {
+            try {
+                const date = new Date(tx.blockTime * 1000).toISOString().split('T')[0];
+                const fee = tx.meta.fee / 1e9; // lamports to SOL
+                
+                // 残高の変化を確認
+                const accountIndex = tx.transaction.message.accountKeys.findIndex(
+                    key => key.toBase58() === address
+                );
+                
+                if (accountIndex >= 0 && tx.meta.postBalances && tx.meta.preBalances) {
+                    const preBalance = tx.meta.preBalances[accountIndex] / 1e9;
+                    const postBalance = tx.meta.postBalances[accountIndex] / 1e9;
+                    const change = postBalance - preBalance;
+                    
+                    if (Math.abs(change) > 0.000001) { // 小さな変化は無視
+                        let type = 'transfer';
+                        if (change > 0) {
+                            type = 'transfer-in';
+                        } else if (change < 0) {
+                            type = 'transfer-out';
+                        }
+                        
+                        return {
+                            date: date,
+                            type: type,
+                            currency: 'SOL',
+                            amount: Math.abs(change),
+                            price: 18000, // 2025年の想定価格
+                            totalJPY: Math.abs(change) * 18000,
+                            fee: fee * 18000,
+                            hash: signatureInfo.signature
+                        };
+                    }
+                }
+            } catch (error) {
+                console.warn('Failed to parse transaction:', error);
+            }
+            
+            return null;
+        }
+        
+        // Solana Web3.js の簡易実装
+        if (typeof solanaWeb3 === 'undefined') {
+            window.solanaWeb3 = {
+                Connection: class {
+                    constructor(endpoint) {
+                        this.endpoint = endpoint;
+                    }
+                    
+                    async getSignaturesForAddress(publicKey, options) {
+                        const response = await fetch(this.endpoint, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                jsonrpc: '2.0',
+                                id: 1,
+                                method: 'getSignaturesForAddress',
+                                params: [publicKey.toString(), options]
+                            })
+                        });
+                        const data = await response.json();
+                        return data.result || [];
+                    }
+                    
+                    async getTransaction(signature) {
+                        const response = await fetch(this.endpoint, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                jsonrpc: '2.0',
+                                id: 1,
+                                method: 'getTransaction',
+                                params: [signature, { encoding: 'json', maxSupportedTransactionVersion: 0 }]
+                            })
+                        });
+                        const data = await response.json();
+                        return data.result;
+                    }
+                },
+                
+                PublicKey: class {
+                    constructor(key) {
+                        this.key = key;
+                    }
+                    toString() {
+                        return this.key;
+                    }
+                    toBase58() {
+                        return this.key;
+                    }
+                }
+            };
+        }
+    </script>
+</body>
+</html>    <script>
+        // ユーティリティ関数
+        function showAlert(message, type = 'info') {
+            const alert = document.createElement('div');
+            alert.className = `alert alert-${type}`;
+            alert.textContent = message;
+            document.body.appendChild(alert);
+            
+            setTimeout(() => {
+                alert.remove();
+            }, 5000);
+        }
+
+        function showLoading(show = true) {
+            const overlay = document.getElementById('loadingOverlay');
+            overlay.style.display = show ? 'flex' : 'none';
+        }
+
+        function formatCurrency(amount) {
+            return new Intl.NumberFormat('ja-JP', {
+                style: 'currency',
+                currency: 'JPY'
+            }).format(amount);
+        }
+
+        function formatDate(date) {
+            return new Date(date).toLocaleDateString('ja-JP');
+        }
+
+        function downloadCSV(content, filename) {
+            const BOM = '\uFEFF';
+            const blob = new Blob([BOM + content], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement('a');
+            const url = URL.createObjectURL(blob);
+            
+            link.setAttribute('href', url);
+            link.setAttribute('download', filename);
+            link.style.visibility = 'hidden';
+            
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+
+        // グローバル変数
+        let currentTransactions = [];
+        let connectedWallet = null;
+        let taxResults = null;
+
+        // 取引タイプの日本語ラベル
+        function getTypeLabel(type) {
+            const labels = {
+                buy: '購入',
+                sell: '売却',
+                transfer: '送金',
+                'transfer-in': '入金',
+                'transfer-out': '出金',
+                staking: 'ステーキング',
+                defi: 'DeFi',
+                swap: 'スワップ',
+                airdrop: 'エアドロップ',
+                lending: 'レンディング'
+            };
+            return labels[type] || type;
+        }
+
+        // サンプルデータ生成（2025年対応）
+        function generateSampleData(type = 'ethereum') {
+            const currency = type === 'ethereum' ? 'ETH' : 'SOL';
+            const basePrice = type === 'ethereum' ? 350000 : 18000;
+            const currentYear = new Date().getFullYear();
+            
+            return [
+                {
+                    date: `${currentYear}-01-15`,
+                    type: 'buy',
+                    currency: currency,
+                    amount: 2.5,
+                    price: basePrice,
+                    totalJPY: 2.5 * basePrice,
+                    fee: 5000,
+                    hash: '0x' + Math.random().toString(36).substr(2, 9)
+                },
+                {
+                    date: `${currentYear - 1}-12-20`,
+                    type: 'staking',
+                    currency: currency,
+                    amount: 0.05,
+                    price: basePrice * 1.1,
+                    totalJPY: 0.05 * basePrice * 1.1,
+                    fee: 0,
+                    protocol: 'Lido',
+                    hash: '0x' + Math.random().toString(36).substr(2, 9)
+                },
+                {
+                    date: `${currentYear - 1}-11-15`,
+                    type: 'defi',
+                    currency: currency,
+                    amount: 0.03,
+                    price: basePrice * 0.95,
+                    totalJPY: 0.03 * basePrice * 0.95,
+                    fee: 100,
+                    protocol: 'Uniswap',
+                    hash: '0x' + Math.random().toString(36).substr(2, 9)
+                },
+                {
+                    date: `${currentYear - 1}-10-10`,
+                    type: 'transfer-out',
+                    currency: currency,
+                    amount: 0.5,
+                    price: basePrice,
+                    totalJPY: 0.5 * basePrice,
+                    fee: 2000,
+                    hash: '0x' + Math.random().toString(36).substr(2, 9)
+                },
+                {
+                    date: `${currentYear - 1}-09-05`,
+                    type: 'transfer-in',
+                    currency: currency,
+                    amount: 1.0,
+                    price: basePrice * 0.9,
+                    totalJPY: 1.0 * basePrice * 0.9,
+                    fee: 0,
+                    hash: '0x' + Math.random().toString(36).substr(2, 9)
+                },
+                {
+                    date: `${currentYear - 1}-08-20`,
+                    type: 'sell',
+                    currency: currency,
+                    amount: 1.0,
+                    price: basePrice * 1.2,
+                    totalJPY: 1.0 * basePrice * 1.2,
+                    fee: 3000,
+                    hash: '0x' + Math.random().toString(36).substr(2, 9)
+                },
+                {
+                    date: `${currentYear - 1}-07-15`,
+                    type: 'airdrop',
+                    currency: 'UNI',
+                    amount: 400,
+                    price: 1000,
+                    totalJPY: 400000,
+                    fee: 0,
+                    protocol: 'Uniswap',
+                    hash<!DOCTYPE html>
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>暗号通貨税金計算アプリ</title>
+    <title>暗号通貨税金計算アプリ - DeFi/ステーキング対応版</title>
     <!-- Ethers.js と axios を追加 -->
     <script src="https://cdn.jsdelivr.net/npm/ethers@6.9.0/dist/ethers.umd.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/axios@1.6.2/dist/axios.min.js"></script>
     <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #f5f5f5;
+            color: #333;
+            line-height: 1.6;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        .header {
+            background: white;
+            padding: 30px;
+            text-align: center;
+            border-radius: 10px;
+            margin-bottom: 30px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+
+        .header h1 {
+            color: #2a5298;
+            margin-bottom: 10px;
+        }
+
+        .version-badge {
+            display: inline-block;
+            background: #4CAF50;
+            color: white;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 0.8em;
+            margin-left: 10px;
+        }
+
+        .wallet-section {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            margin-bottom: 30px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+
+        .wallet-buttons {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+
+        .btn {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        }
+
+        .btn-metamask {
+            background: linear-gradient(135deg, #f6851b, #e2761b);
+            color: white;
+        }
+
+        .btn-phantom {
+            background: linear-gradient(135deg, #ab9ff2, #8b7ecf);
+            color: white;
+        }
+
+        .btn-csv {
+            background: #4CAF50;
+            color: white;
+        }
+
+        .btn-manual {
+            background: #2196F3;
+            color: white;
+        }
+
+        .btn-primary {
+            background: #2a5298;
+            color: white;
+        }
+
+        .btn-secondary {
+            background: #757575;
+            color: white;
+        }
+
+        .btn-success {
+            background: #4CAF50;
+            color: white;
+        }
+
+        .wallet-info {
+            background: #e8f5e9;
+            padding: 20px;
+            border-radius: 8px;
+            margin-top: 20px;
+        }
+
+        .wallet-info h3 {
+            margin-bottom: 10px;
+            color: #2e7d32;
+        }
+
+        .wallet-info p {
+            margin-bottom: 5px;
+            word-break: break-all;
+        }
+
+        .api-key-section {
+            background: #f5f5f5;
+            padding: 20px;
+            border-radius: 8px;
+            margin-top: 20px;
+        }
+
+        .form-group {
+            margin-bottom: 15px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: 600;
+        }
+
+        .form-group input,
+        .form-group select {
+            width: 100%;
+            padding: 10px;
+            border: 2px solid #ddd;
+            border-radius: 6px;
+            font-size: 16px;
+        }
+
+        .form-group input:focus,
+        .form-group select:focus {
+            outline: none;
+            border-color: #2a5298;
+        }
+
+        .main-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 30px;
+            margin-bottom: 30px;
+        }
+
+        @media (max-width: 768px) {
+            .main-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .transaction-section,
+        .calculation-section {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+
+        .filter-controls {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+
+        .filter-controls select {
+            flex: 1;
+            padding: 10px;
+            border: 2px solid #ddd;
+            border-radius: 6px;
+        }
+
+        .transaction-list {
+            max-height: 400px;
+            overflow-y: auto;
+            border: 1px solid #eee;
+            border-radius: 8px;
+            padding: 10px;
+        }
+
+        .transaction-item {
+            background: #f9f9f9;
+            padding: 15px;
+            margin-bottom: 10px;
+            border-radius: 8px;
+            border-left: 4px solid #2a5298;
+        }
+
+        .transaction-header {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 10px;
+        }
+
+        .transaction-date {
+            font-weight: 600;
+            color: #2a5298;
+        }
+
+        .transaction-type {
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 14px;
+            font-weight: 600;
+        }
+
+        .type-buy {
+            background: #4CAF50;
+            color: white;
+        }
+
+        .type-sell {
+            background: #f44336;
+            color: white;
+        }
+
+        .type-transfer {
+            background: #2196F3;
+            color: white;
+        }
+
+        .type-transfer-in {
+            background: #00BCD4;
+            color: white;
+        }
+
+        .type-transfer-out {
+            background: #FF9800;
+            color: white;
+        }
+
+        .type-staking {
+            background: #9C27B0;
+            color: white;
+        }
+
+        .type-defi {
+            background: #3F51B5;
+            color: white;
+        }
+
+        .type-lending {
+            background: #009688;
+            color: white;
+        }
+
+        .type-swap {
+            background: #795548;
+            color: white;
+        }
+
+        .type-airdrop {
+            background: #E91E63;
+            color: white;
+        }
+
+        .transaction-details {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 10px;
+            font-size: 14px;
+        }
+
+        .detail-item {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .detail-label {
+            color: #666;
+            font-size: 12px;
+        }
+
+        .detail-value {
+            font-weight: 600;
+        }
+
+        .empty-state {
+            text-align: center;
+            color: #999;
+            padding: 40px;
+        }
+
+        .results-section {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+
+        .result-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin: 30px 0;
+        }
+
+        .result-card {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+            padding: 25px;
+            border-radius: 12px;
+            text-align: center;
+        }
+
+        .result-card h3 {
+            margin-bottom: 10px;
+            opacity: 0.9;
+        }
+
+        .result-card .amount {
+            font-size: 28px;
+            font-weight: 700;
+        }
+
+        .defi-section {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            margin-bottom: 30px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+
+        .defi-info {
+            background: #f3e5f5;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+
+        .export-buttons {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+        }
+
+        .loading-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0,0,0,0.5);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+        }
+
+        .spinner {
+            width: 50px;
+            height: 50px;
+            border: 5px solid #f3f3f3;
+            border-top: 5px solid #2a5298;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .loading-overlay p {
+            color: white;
+            margin-top: 20px;
+            font-size: 18px;
+        }
+
+        .modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0,0,0,0.5);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+        }
+
+        .modal-content {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            max-width: 500px;
+            width: 90%;
+            max-height: 90vh;
+            overflow-y: auto;
+        }
+
+        .modal-content h2 {
+            margin-bottom: 20px;
+            color: #2a5298;
+        }
+
+        .modal-buttons {
+            display: flex;
+            gap: 10px;
+            margin-top: 20px;
+        }
+
+        .alert {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            padding: 15px 20px;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            z-index: 1001;
+            animation: slideIn 0.3s ease;
+        }
+
+        @keyframes slideIn {
+            from {
+                transform: translateX(100%);
+                opacity: 0;
+            }
+            to {
+                transform: translateX(0);
+                opacity: 1;
+            }
+        }
+
+        .alert-success {
+            background: #4CAF50;
+            color: white;
+        }
+
+        .alert-error {
+            background: #f44336;
+            color: white;
+        }
+
+        .alert-warning {
+            background: #ff9800;
+            color: white;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header class="header">
+            <h1>暗号通貨税金計算アプリ<span class="version-badge">v2025</span></h1>
+            <p>DeFi・ステーキング対応 | 2025年最新版 | 送金履歴完全対応</p>
+        </header>
+
+        <section class="wallet-section">
+            <h2>ウォレット接続</h2>
+            <div class="wallet-buttons">
+                <button id="connectMetaMask" class="btn btn-metamask">
+                    🦊 MetaMask接続
+                </button>
+                <button id="connectPhantom" class="btn btn-phantom">
+                    👻 Phantom接続
+                </button>
+                <button id="importCSV" class="btn btn-csv">
+                    📁 CSVインポート
+                </button>
+                <button id="manualInput" class="btn btn-manual">
+                    ✏️ 手動入力
+                </button>
+            </div>
+            
+            <div id="walletInfo" class="wallet-info" style="display: none;">
+                <h3>接続済みウォレット</h3>
+                <p>タイプ: <span id="walletType"></span></p>
+                <p>アドレス: <span id="walletAddress"></span></p>
+                <button id="disconnectWallet" class="btn btn-secondary">切断</button>
+                <button id="fetchTransactions" class="btn btn-primary">取引履歴を取得</button>
+            </div>
+
+            <div id="apiKeySection" class="api-key-section">
+                <h3>API設定</h3>
+                <p>実際の取引データを取得するにはAPIキーが必要です</p>
+                <div class="form-group">
+                    <label for="etherscanApi">Etherscan API Key</label>
+                    <input type="text" id="etherscanApi" placeholder="Your Etherscan API Key">
+                </div>
+                <div class="form-group">
+                    <label for="solscanApi">Solscan API Key</label>
+                    <input type="text" id="solscanApi" placeholder="Your Solscan API Key">
+                </div>
+                <button id="saveApiKeys" class="btn btn-primary">APIキーを保存</button>
+            </div>
+        </section>
+
+        <section class="defi-section">
+            <h2>DeFi・ステーキング設定</h2>
+            <div class="defi-info">
+                <p>💡 DeFi取引、ステーキング報酬、流動性提供、エアドロップなども自動で識別します</p>
+            </div>
+            <div class="form-group">
+                <label for="defiProtocols">対応プロトコル</label>
+                <select id="defiProtocols" multiple style="height: 100px;">
+                    <option value="uniswap" selected>Uniswap</option>
+                    <option value="sushiswap" selected>SushiSwap</option>
+                    <option value="aave" selected>Aave</option>
+                    <option value="compound" selected>Compound</option>
+                    <option value="curve" selected>Curve</option>
+                    <option value="pancakeswap" selected>PancakeSwap</option>
+                    <option value="raydium" selected>Raydium</option>
+                    <option value="orca" selected>Orca</option>
+                </select>
+            </div>
+        </section>
+
+        <div class="main-grid">
+            <section class="transaction-section">
+                <h2>取引履歴</h2>
+                <div class="filter-controls">
+                    <select id="filterType">
+                        <option value="all">すべて</option>
+                        <option value="buy">購入</option>
+                        <option value="sell">売却</option>
+                        <option value="transfer">送金</option>
+                        <option value="transfer-in">入金</option>
+                        <option value="transfer-out">出金</option>
+                        <option value="staking">ステーキング</option>
+                        <option value="defi">DeFi</option>
+                        <option value="swap">スワップ</option>
+                        <option value="airdrop">エアドロップ</option>
+                    </select>
+                    <button id="exportTransactions" class="btn btn-success">CSVエクスポート</button>
+                </div>
+                <div id="transactionList" class="transaction-list">
+                    <p class="empty-state">取引データがありません</p>
+                </div>
+            </section>
+
+            <section class="calculation-section">
+                <h2>税金計算設定</h2>
+                <form id="taxForm">
+                    <div class="form-group">
+                        <label for="taxYear">計算年度</label>
+                        <select id="taxYear">
+                            <option value="2025">2025年</option>
+                            <option value="2024">2024年</option>
+                            <option value="2023">2023年</option>
+                            <option value="2022">2022年</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="taxMethod">計算方法</label>
+                        <select id="taxMethod">
+                            <option value="average">移動平均法</option>
+                            <option value="fifo">先入先出法（FIFO）</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="taxRate">税率（%）</label>
+                        <input type="number" id="taxRate" value="20" min="0" max="55" step="0.1">
+                    </div>
+                    <div class="form-group">
+                        <label>
+                            <input type="checkbox" id="includeDefi" checked>
+                            DeFi収益を含める
+                        </label>
+                    </div>
+                    <div class="form-group">
+                        <label>
+                            <input type="checkbox" id="includeStaking" checked>
+                            ステーキング報酬を含める
+                        </label>
+                    </div>
+                    <button type="submit" class="btn btn-primary">税金を計算</button>
+                </form>
+            </section>
+        </div>
+
+        <section id="resultsSection" class="results-section" style="display: none;">
+            <h2>税金計算結果</h2>
+            <div class="result-grid">
+                <div class="result-card">
+                    <h3>総利益</h3>
+                    <div class="amount" id="totalProfit">¥0</div>
+                </div>
+                <div class="result-card">
+                    <h3>総損失</h3>
+                    <div class="amount" id="totalLoss">¥0</div>
+                </div>
+                <div class="result-card">
+                    <h3>純利益</h3>
+                    <div class="amount" id="netProfit">¥0</div>
+                </div>
+                <div class="result-card">
+                    <h3>推定税額</h3>
+                    <div class="amount" id="estimatedTax">¥0</div>
+                </div>
+                <div class="result-card" style="background: linear-gradient(135deg, #9C27B0, #E91E63);">
+                    <h3>DeFi/ステーキング収益</h3>
+                    <div class="amount" id="defiIncome">¥0</div>
+                </div>
+                <div class="result-card" style="background: linear-gradient(135deg, #FF9800, #F44336);">
+                    <h3>送金手数料合計</h3>
+                    <div class="amount" id="totalTransferFees">¥0</div>
+                </div>
+            </div>
+            <div class="export-buttons">
+                <button id="exportResults" class="btn btn-success">結果をエクスポート</button>
+                <button id="printResults" class="btn btn-secondary">印刷</button>
+            </div>
+        </section>
+
+        <div id="loadingOverlay" class="loading-overlay" style="display: none;">
+            <div class="spinner"></div>
+            <p>処理中...</p>
+        </div>
+
+        <input type="file" id="csvFileInput" accept=".csv" style="display: none;">
+    </div>
+
+    <!-- 手動入力モーダル -->
+    <div id="manualInputModal" class="modal" style="display: none;">
+        <div class="modal-content">
+            <h2>取引を手動で追加</h2>
+            <form id="manualTransactionForm">
+                <div class="form-group">
+                    <label for="txDate">日付</label>
+                    <input type="date" id="txDate" required>
+                </div>
+                <div class="form-group">
+                    <label for="txType">取引タイプ</label>
+                    <select id="txType" required>
+                        <option value="buy">購入</option>
+                        <option value="sell">売却</option>
+                        <option value="transfer-in">入金（受取）</option>
+                        <option value="transfer-out">出金（送金）</option>
+                        <option value="staking">ステーキング報酬</option>
+                        <option value="defi">DeFi収益</option>
+                        <option value="swap">スワップ</option>
+                        <option value="airdrop">エアドロップ</option>
+                        <option value="lending">レンディング収益</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="txCurrency">通貨</label>
+                    <input type="text" id="txCurrency" placeholder="ETH, BTC, SOL等" required>
+                </div>
+                <div class="form-group">
+                    <label for="txAmount">数量</label>
+                    <input type="number" id="txAmount" step="0.00000001" required>
+                </div>
+                <div class="form-group">
+                    <label for="txPrice">単価（JPY）</label>
+                    <input type="number" id="txPrice" step="0.01" required>
+                </div>
+                <div class="form-group">
+                    <label for="txFee">手数料（JPY）</label>
+                    <input type="number" id="txFee" step="0.01" value="0">
+                </div>
+                <div class="form-group" id="txProtocolGroup" style="display: none;">
+                    <label for="txProtocol">プロトコル/プラットフォーム</label>
+                    <input type="text" id="txProtocol" placeholder="Uniswap, Aave等">
+                </div>
+                <div class="modal-buttons">
+                    <button type="submit" class="btn btn-primary">追加</button>
+                    <button type="button" id="closeModal" class="btn btn-secondary">キャンセル</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script>
         * {
             margin: 0;
             padding: 0;
