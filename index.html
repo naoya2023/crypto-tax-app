@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>暗号通貨税金計算アプリ 2025 - 完全動作版</title>
+    <title>暗号通貨税金計算アプリ 2025 - ポートフォリオ管理機能付き</title>
     <style>
         * {
             margin: 0;
@@ -66,6 +66,255 @@
             font-size: 0.85em;
         }
 
+        /* タブナビゲーション */
+        .tab-navigation {
+            background: white;
+            border-radius: 15px;
+            padding: 10px;
+            margin-bottom: 30px;
+            box-shadow: 0 5px 20px rgba(0, 0, 0, 0.1);
+            display: flex;
+            gap: 10px;
+        }
+
+        .tab-button {
+            flex: 1;
+            padding: 15px 25px;
+            border: none;
+            border-radius: 10px;
+            font-size: 1.1em;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            background: #f5f5f5;
+            color: #666;
+        }
+
+        .tab-button.active {
+            background: linear-gradient(135deg, #2a5298, #1e3c72);
+            color: white;
+        }
+
+        .tab-button:hover {
+            background: #e0e0e0;
+        }
+
+        .tab-button.active:hover {
+            background: linear-gradient(135deg, #2a5298, #1e3c72);
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        /* ポートフォリオセクション */
+        .portfolio-summary {
+            background: white;
+            border-radius: 15px;
+            padding: 30px;
+            margin-bottom: 30px;
+            box-shadow: 0 5px 20px rgba(0, 0, 0, 0.1);
+        }
+
+        .portfolio-stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .portfolio-stat {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 25px;
+            border-radius: 12px;
+            text-align: center;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
+        }
+
+        .portfolio-stat.crypto {
+            background: linear-gradient(135deg, #f6851b, #e2761b);
+        }
+
+        .portfolio-stat.nft {
+            background: linear-gradient(135deg, #ab9ff2, #8b7ecf);
+        }
+
+        .portfolio-stat.total {
+            background: linear-gradient(135deg, #4CAF50, #45a049);
+        }
+
+        .portfolio-stat h3 {
+            font-size: 1.2em;
+            margin-bottom: 10px;
+            opacity: 0.9;
+        }
+
+        .portfolio-stat .value {
+            font-size: 2em;
+            font-weight: 700;
+            margin-top: 10px;
+        }
+
+        .portfolio-detail {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 30px;
+        }
+
+        @media (max-width: 968px) {
+            .portfolio-detail {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .holdings-card {
+            background: white;
+            border-radius: 15px;
+            padding: 25px;
+            box-shadow: 0 5px 20px rgba(0, 0, 0, 0.1);
+        }
+
+        .holdings-card h2 {
+            color: #2a5298;
+            margin-bottom: 20px;
+            font-size: 1.8em;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .holdings-list {
+            max-height: 500px;
+            overflow-y: auto;
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+            padding: 10px;
+        }
+
+        .holding-item {
+            background: #f8f9fa;
+            padding: 15px;
+            margin-bottom: 10px;
+            border-radius: 10px;
+            border-left: 4px solid #2a5298;
+            transition: all 0.3s ease;
+        }
+
+        .holding-item.nft {
+            border-left-color: #ab9ff2;
+        }
+
+        .holding-item:hover {
+            background: #e9ecef;
+            transform: translateX(5px);
+        }
+
+        .holding-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+
+        .holding-name {
+            font-weight: 600;
+            font-size: 1.1em;
+            color: #333;
+        }
+
+        .holding-value {
+            font-weight: 700;
+            font-size: 1.2em;
+            color: #2a5298;
+        }
+
+        .holding-details {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 10px;
+            font-size: 0.9em;
+        }
+
+        .holding-detail {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .holding-label {
+            color: #666;
+            font-size: 0.85em;
+        }
+
+        .holding-detail-value {
+            font-weight: 600;
+            color: #333;
+        }
+
+        .profit {
+            color: #4CAF50;
+        }
+
+        .loss {
+            color: #f44336;
+        }
+
+        .nft-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 15px;
+            margin-top: 20px;
+        }
+
+        .nft-card {
+            background: #f8f9fa;
+            border-radius: 10px;
+            padding: 15px;
+            text-align: center;
+            transition: all 0.3s ease;
+            border: 2px solid transparent;
+        }
+
+        .nft-card:hover {
+            border-color: #ab9ff2;
+            transform: translateY(-5px);
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+        }
+
+        .nft-image {
+            width: 100%;
+            height: 150px;
+            background: linear-gradient(135deg, #ab9ff2, #8b7ecf);
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 3em;
+            margin-bottom: 10px;
+        }
+
+        .nft-name {
+            font-weight: 600;
+            margin-bottom: 5px;
+        }
+
+        .nft-token-id {
+            color: #666;
+            font-size: 0.9em;
+            margin-bottom: 10px;
+        }
+
+        .nft-value {
+            font-weight: 700;
+            color: #2a5298;
+        }
+
+        /* 既存のスタイル */
         .wallet-connection {
             background: white;
             border-radius: 15px;
@@ -120,12 +369,6 @@
             box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
         }
 
-        .wallet-btn:disabled {
-            opacity: 0.6;
-            cursor: not-allowed;
-            transform: none;
-        }
-
         .connected-wallet {
             background: #e8f5e9;
             border: 2px solid #4CAF50;
@@ -144,19 +387,6 @@
             font-size: 0.9em;
             word-break: break-all;
             margin: 10px 0;
-        }
-
-        .info-box {
-            background: #e3f2fd;
-            border: 1px solid #2196F3;
-            border-radius: 8px;
-            padding: 15px;
-            margin-bottom: 15px;
-        }
-
-        .info-box p {
-            margin: 5px 0;
-            font-size: 0.9em;
         }
 
         .main-content {
@@ -366,15 +596,6 @@
             margin-top: 10px;
         }
 
-        .warning {
-            background: #fff3cd;
-            border: 1px solid #ffeaa7;
-            color: #856404;
-            padding: 15px;
-            border-radius: 8px;
-            margin-top: 20px;
-        }
-
         .loading {
             display: none;
             text-align: center;
@@ -503,125 +724,193 @@
             font-weight: 700;
             color: #333;
         }
+
+        .warning {
+            background: #fff3cd;
+            border: 1px solid #ffeaa7;
+            color: #856404;
+            padding: 15px;
+            border-radius: 8px;
+            margin-top: 20px;
+        }
+
+        .refresh-btn {
+            background: #2196F3;
+            color: white;
+            padding: 8px 20px;
+            border: none;
+            border-radius: 6px;
+            font-size: 0.9em;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .refresh-btn:hover {
+            background: #1976D2;
+        }
+
+        .export-portfolio-btn {
+            background: #4CAF50;
+            color: white;
+            padding: 10px 25px;
+            border: none;
+            border-radius: 8px;
+            font-size: 1em;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            margin-top: 20px;
+        }
+
+        .export-portfolio-btn:hover {
+            background: #45a049;
+        }
     </style>
 </head>
 <body>
     <div class="container">
         <div class="header">
             <h1>暗号通貨税金計算アプリ<span class="version-badge">2025年版</span></h1>
-            <p>実ウォレット接続対応 | DeFi・ステーキング・送金完全サポート | 自動取引履歴取得</p>
+            <p>実ウォレット接続対応 | ポートフォリオ管理 | DeFi・ステーキング・送金完全サポート</p>
             <div class="features-list">
+                <span class="feature-tag">💼 ポートフォリオ管理</span>
                 <span class="feature-tag">📊 2025年税制対応</span>
                 <span class="feature-tag">🔐 ウォレット接続</span>
-                <span class="feature-tag">💎 ステーキング報酬</span>
-                <span class="feature-tag">💸 送金履歴管理</span>
-                <span class="feature-tag">🎁 エアドロップ対応</span>
-                <div style="margin-top: 10px; display: none;" id="fetchProgress">
-                    <div style="background: #e3f2fd; padding: 10px; border-radius: 8px;">
-                        <p id="fetchStatus">取引履歴を取得中...</p>
-                        <div style="width: 100%; height: 8px; background: #ddd; border-radius: 4px; margin-top: 8px;">
-                            <div id="progressBar" style="height: 100%; background: #2196F3; width: 0%; border-radius: 4px; transition: width 0.3s ease;"></div>
+                <span class="feature-tag">🎨 NFT資産管理</span>
+                <span class="feature-tag">💸 リアルタイム評価</span>
+            </div>
+        </div>
+
+        <!-- タブナビゲーション -->
+        <div class="tab-navigation">
+            <button class="tab-button active" onclick="switchTab('portfolio')">
+                💼 ポートフォリオ
+            </button>
+            <button class="tab-button" onclick="switchTab('transactions')">
+                📋 取引管理
+            </button>
+            <button class="tab-button" onclick="switchTab('tax')">
+                🧮 税金計算
+            </button>
+        </div>
+
+        <!-- ポートフォリオタブ -->
+        <div id="portfolioTab" class="tab-content active">
+            <div class="portfolio-summary">
+                <h2>📊 ポートフォリオサマリー</h2>
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                    <p>現在の保有資産の概要</p>
+                    <button class="refresh-btn" onclick="refreshPortfolio()">
+                        🔄 価格を更新
+                    </button>
+                </div>
+                
+                <div class="portfolio-stats">
+                    <div class="portfolio-stat total">
+                        <h3>総資産価値</h3>
+                        <div class="value" id="totalAssetValue">¥0</div>
+                    </div>
+                    <div class="portfolio-stat crypto">
+                        <h3>仮想通貨資産</h3>
+                        <div class="value" id="cryptoAssetValue">¥0</div>
+                    </div>
+                    <div class="portfolio-stat nft">
+                        <h3>NFT資産</h3>
+                        <div class="value" id="nftAssetValue">¥0</div>
+                    </div>
+                </div>
+
+                <div class="portfolio-detail">
+                    <div class="holdings-card">
+                        <h2>💰 仮想通貨保有一覧</h2>
+                        <div id="cryptoHoldingsList" class="holdings-list">
+                            <p style="text-align: center; color: #999;">保有データがありません</p>
+                        </div>
+                    </div>
+
+                    <div class="holdings-card">
+                        <h2>🎨 NFT保有一覧</h2>
+                        <div id="nftHoldingsList" class="holdings-list">
+                            <p style="text-align: center; color: #999;">保有NFTがありません</p>
                         </div>
                     </div>
                 </div>
+
+                <div style="text-align: center;">
+                    <button class="export-portfolio-btn" onclick="exportPortfolio()">
+                        📄 ポートフォリオをエクスポート
+                    </button>
+                </div>
+            </div>
+
+            <!-- NFTギャラリー -->
+            <div class="card" style="margin-top: 30px;">
+                <h2>🖼️ NFTギャラリー</h2>
+                <div id="nftGallery" class="nft-grid">
+                    <p style="text-align: center; color: #999; grid-column: 1 / -1;">NFTがありません</p>
+                </div>
             </div>
         </div>
 
-        <div class="wallet-connection">
-            <h2>ウォレット接続</h2>
-            <p>お使いのウォレットを接続するか、CSVファイルをインポートしてください。</p>
-            
-            <div class="info-box">
-                <p><strong>ウォレット接続について：</strong></p>
-                <p>• MetaMask: Ethereumメインネットの取引履歴を取得します</p>
-                <p>• Phantom: Solanaメインネットの取引履歴を取得します</p>
-                <p>• 実際のウォレットが検出されない場合、デモモードで動作確認できます</p>
-            </div>
-            
-            <div class="wallet-buttons">
-                <button class="wallet-btn metamask-btn" id="connectMetaMaskBtn">
-                    🦊 MetaMask接続
-                </button>
-                <button class="wallet-btn phantom-btn" id="connectPhantomBtn">
-                    👻 Phantom接続
-                </button>
-                <button class="wallet-btn csv-btn" id="importCsvBtn">
-                    📁 CSVインポート
-                </button>
-                <button class="wallet-btn manual-btn" id="manualInputBtn">
-                    ✏️ 手動入力
-                </button>
-            </div>
-            <input type="file" id="csvFile" accept=".csv" style="display: none;">
-            
-            <div id="connectedWallet" class="connected-wallet">
-                <strong>接続済みウォレット:</strong>
-                <div id="walletType"></div>
-                <div class="wallet-address" id="walletAddress"></div>
-                <button class="btn btn-success" id="fetchTransactionsBtn">取引履歴を取得</button>
-                <button class="btn btn-secondary" id="disconnectBtn">切断</button>
-            </div>
-            
-            <div class="api-settings">
-                <h3>🔑 API設定（実際のブロックチェーンデータ取得用）</h3>
-                <div class="info-box">
-                    <p><strong>APIキーについて：</strong></p>
-                    <p>• <a href="https://etherscan.io/apis" target="_blank">Etherscan API</a>: Ethereum取引履歴、ERC20トークン、NFT取引</p>
-                    <p>• <a href="https://docs.solscan.io/" target="_blank">Solscan API</a>: Solana取引履歴、SPLトークン、DEX取引</p>
-                    <p>• <a href="https://www.coingecko.com/en/api" target="_blank">CoinGecko API</a>: 過去の価格データ取得（オプション）</p>
+        <!-- 取引管理タブ -->
+        <div id="transactionsTab" class="tab-content">
+            <div class="wallet-connection">
+                <h2>ウォレット接続</h2>
+                <p>お使いのウォレットを接続するか、CSVファイルをインポートしてください。</p>
+                
+                <div class="wallet-buttons">
+                    <button class="wallet-btn metamask-btn" id="connectMetaMaskBtn">
+                        🦊 MetaMask接続
+                    </button>
+                    <button class="wallet-btn phantom-btn" id="connectPhantomBtn">
+                        👻 Phantom接続
+                    </button>
+                    <button class="wallet-btn csv-btn" id="importCsvBtn">
+                        📁 CSVインポート
+                    </button>
+                    <button class="wallet-btn manual-btn" id="manualInputBtn">
+                        ✏️ 手動入力
+                    </button>
                 </div>
-                <div class="form-group">
-                    <label for="etherscanApi">Etherscan API Key</label>
-                    <input type="text" id="etherscanApi" placeholder="Your Etherscan API Key">
-                    <small>無料プランで十分です。月5回のAPI呼び出し制限があります。</small>
+                <input type="file" id="csvFile" accept=".csv" style="display: none;">
+                
+                <div id="connectedWallet" class="connected-wallet">
+                    <strong>接続済みウォレット:</strong>
+                    <div id="walletType"></div>
+                    <div class="wallet-address" id="walletAddress"></div>
+                    <button class="btn btn-success" id="fetchTransactionsBtn">取引履歴を取得</button>
+                    <button class="btn btn-secondary" id="disconnectBtn">切断</button>
                 </div>
-                <div class="form-group">
-                    <label for="solscanApi">Solscan API Key</label>
-                    <input type="text" id="solscanApi" placeholder="Your Solscan API Key">
-                    <small>Solana取引の詳細情報を取得できます。</small>
-                </div>
-                <div class="form-group">
-                    <label for="coinGeckoApi">CoinGecko API Key（オプション）</label>
-                    <input type="text" id="coinGeckoApi" placeholder="Your CoinGecko API Key">
-                    <small>過去の価格データを正確に取得できます。無料プランでも利用可能。</small>
-                </div>
-                <button class="btn" id="saveApiKeysBtn">APIキーを保存</button>
-                <div style="margin-top: 10px;">
-                    <small id="apiStatus">APIキーが保存されていません</small>
+                
+                <div class="loading" id="loadingIndicator">
+                    <div class="spinner"></div>
+                    <p>処理中...</p>
                 </div>
             </div>
-            
-            <div class="loading" id="loadingIndicator">
-                <div class="spinner"></div>
-                <p>処理中...</p>
-            </div>
-        </div>
 
-        <div class="stats-grid">
-            <div class="stat-card">
-                <h3>総取引数</h3>
-                <div class="value" id="totalTxCount">0</div>
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <h3>総取引数</h3>
+                    <div class="value" id="totalTxCount">0</div>
+                </div>
+                <div class="stat-card">
+                    <h3>対応通貨数</h3>
+                    <div class="value" id="currencyCount">0</div>
+                </div>
+                <div class="stat-card">
+                    <h3>DeFi取引</h3>
+                    <div class="value" id="defiTxCount">0</div>
+                </div>
+                <div class="stat-card">
+                    <h3>NFT取引</h3>
+                    <div class="value" id="nftTxCount">0</div>
+                </div>
+                <div class="stat-card">
+                    <h3>ステーキング報酬</h3>
+                    <div class="value" id="stakingTxCount">0</div>
+                </div>
             </div>
-            <div class="stat-card">
-                <h3>対応通貨数</h3>
-                <div class="value" id="currencyCount">0</div>
-            </div>
-            <div class="stat-card">
-                <h3>DeFi取引</h3>
-                <div class="value" id="defiTxCount">0</div>
-            </div>
-            <div class="stat-card">
-                <h3>NFT取引</h3>
-                <div class="value" id="nftTxCount">0</div>
-            </div>
-            <div class="stat-card">
-                <h3>ステーキング報酬</h3>
-                <div class="value" id="stakingTxCount">0</div>
-            </div>
-        </div>
 
-        <div class="main-content">
-            <div class="card">
+            <div class="card" style="margin-top: 30px;">
                 <h2>取引履歴</h2>
                 <div class="form-group">
                     <label>フィルター:</label>
@@ -646,90 +935,108 @@
                     <small>取引件数: <span id="txCount">0</span>件</small>
                 </div>
             </div>
-
-            <div class="card">
-                <h2>税金計算設定</h2>
-                <form id="taxForm">
-                    <div class="form-group">
-                        <label for="taxYear">計算年度</label>
-                        <select id="taxYear">
-                            <option value="2025">2025年</option>
-                            <option value="2024">2024年</option>
-                            <option value="2023">2023年</option>
-                            <option value="2022">2022年</option>
-                        </select>
-                    </div>
-                    
-                    <div class="form-group">
-                        <label for="taxMethod">計算方法</label>
-                        <select id="taxMethod">
-                            <option value="average">移動平均法</option>
-                            <option value="fifo">先入先出法（FIFO）</option>
-                        </select>
-                    </div>
-                    
-                    <div class="form-group">
-                        <label for="taxRate">税率（%）</label>
-                        <input type="number" id="taxRate" value="20" min="0" max="55" step="0.1">
-                    </div>
-                    
-                    <div style="margin-bottom: 20px;">
-                        <h4 style="margin-bottom: 10px;">計算対象</h4>
-                        <div class="checkbox-group">
-                            <input type="checkbox" id="includeDefi" checked>
-                            <label for="includeDefi">DeFi収益を含める</label>
-                        </div>
-                        <div class="checkbox-group">
-                            <input type="checkbox" id="includeStaking" checked>
-                            <label for="includeStaking">ステーキング報酬を含める</label>
-                        </div>
-                        <div class="checkbox-group">
-                            <input type="checkbox" id="includeNft" checked>
-                            <label for="includeNft">NFT取引を含める</label>
-                        </div>
-                    </div>
-                    
-                    <button type="submit" class="btn">税金を計算</button>
-                </form>
-                
-                <div class="warning">
-                    <strong>注意:</strong> この計算結果は参考値です。実際の申告には税理士にご相談ください。
-                </div>
-            </div>
         </div>
 
-        <div class="results-section" id="resultsSection" style="display: none;">
-            <h2>税金計算結果</h2>
-            <div class="result-grid">
-                <div class="result-card">
-                    <h3>売買利益</h3>
-                    <div class="amount" id="totalProfit">¥0</div>
+        <!-- 税金計算タブ -->
+        <div id="taxTab" class="tab-content">
+            <div class="main-content">
+                <div class="card">
+                    <h2>税金計算設定</h2>
+                    <form id="taxForm">
+                        <div class="form-group">
+                            <label for="taxYear">計算年度</label>
+                            <select id="taxYear">
+                                <option value="2025">2025年</option>
+                                <option value="2024">2024年</option>
+                                <option value="2023">2023年</option>
+                                <option value="2022">2022年</option>
+                            </select>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="taxMethod">計算方法</label>
+                            <select id="taxMethod">
+                                <option value="average">移動平均法</option>
+                                <option value="fifo">先入先出法（FIFO）</option>
+                            </select>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="taxRate">税率（%）</label>
+                            <input type="number" id="taxRate" value="20" min="0" max="55" step="0.1">
+                        </div>
+                        
+                        <div style="margin-bottom: 20px;">
+                            <h4 style="margin-bottom: 10px;">計算対象</h4>
+                            <div class="checkbox-group">
+                                <input type="checkbox" id="includeDefi" checked>
+                                <label for="includeDefi">DeFi収益を含める</label>
+                            </div>
+                            <div class="checkbox-group">
+                                <input type="checkbox" id="includeStaking" checked>
+                                <label for="includeStaking">ステーキング報酬を含める</label>
+                            </div>
+                            <div class="checkbox-group">
+                                <input type="checkbox" id="includeNft" checked>
+                                <label for="includeNft">NFT取引を含める</label>
+                            </div>
+                        </div>
+                        
+                        <button type="submit" class="btn">税金を計算</button>
+                    </form>
+                    
+                    <div class="warning">
+                        <strong>注意:</strong> この計算結果は参考値です。実際の申告には税理士にご相談ください。
+                    </div>
                 </div>
-                <div class="result-card">
-                    <h3>売買損失</h3>
-                    <div class="amount" id="totalLoss">¥0</div>
-                </div>
-                <div class="result-card">
-                    <h3>純利益</h3>
-                    <div class="amount" id="netProfit">¥0</div>
-                </div>
-                <div class="result-card">
-                    <h3>推定税額</h3>
-                    <div class="amount" id="estimatedTax">¥0</div>
-                </div>
-                <div class="result-card defi-card">
-                    <h3>DeFi/ステーキング収益</h3>
-                    <div class="amount" id="defiIncome">¥0</div>
-                </div>
-                <div class="result-card" style="background: linear-gradient(135deg, #FF5722, #E91E63);">
-                    <h3>NFT売買損益</h3>
-                    <div class="amount" id="nftIncome">¥0</div>
+
+                <div class="card">
+                    <h2>保有資産の現在価値</h2>
+                    <div style="padding: 20px; text-align: center;">
+                        <h3 style="color: #666; margin-bottom: 20px;">総資産価値</h3>
+                        <div style="font-size: 2.5em; font-weight: 700; color: #2a5298;">
+                            <span id="totalValueInTax">¥0</span>
+                        </div>
+                        <p style="margin-top: 20px; color: #666;">
+                            含み益/損は売却時まで課税対象になりません
+                        </p>
+                    </div>
                 </div>
             </div>
-            
-            <div style="text-align: center; margin-top: 30px;">
-                <button class="btn btn-success" id="exportResultsBtn">計算結果をCSVエクスポート</button>
-                <button class="btn btn-secondary" id="printResultsBtn">印刷</button>
+
+            <div class="results-section" id="resultsSection" style="display: none; margin-top: 30px;">
+                <h2>税金計算結果</h2>
+                <div class="result-grid">
+                    <div class="result-card">
+                        <h3>売買利益</h3>
+                        <div class="amount" id="totalProfit">¥0</div>
+                    </div>
+                    <div class="result-card">
+                        <h3>売買損失</h3>
+                        <div class="amount" id="totalLoss">¥0</div>
+                    </div>
+                    <div class="result-card">
+                        <h3>純利益</h3>
+                        <div class="amount" id="netProfit">¥0</div>
+                    </div>
+                    <div class="result-card">
+                        <h3>推定税額</h3>
+                        <div class="amount" id="estimatedTax">¥0</div>
+                    </div>
+                    <div class="result-card defi-card" style="background: linear-gradient(135deg, #9C27B0, #E91E63);">
+                        <h3>DeFi/ステーキング収益</h3>
+                        <div class="amount" id="defiIncome">¥0</div>
+                    </div>
+                    <div class="result-card" style="background: linear-gradient(135deg, #FF5722, #E91E63);">
+                        <h3>NFT売買損益</h3>
+                        <div class="amount" id="nftIncome">¥0</div>
+                    </div>
+                </div>
+                
+                <div style="text-align: center; margin-top: 30px;">
+                    <button class="btn btn-success" id="exportResultsBtn">計算結果をCSVエクスポート</button>
+                    <button class="btn btn-secondary" id="printResultsBtn">印刷</button>
+                </div>
             </div>
         </div>
     </div>
@@ -793,107 +1100,23 @@
         let transactions = [];
         let connectedWallet = null;
         let walletAddress = null;
-        let apiKeys = {
-            etherscan: localStorage.getItem('etherscanApiKey') || '',
-            solscan: localStorage.getItem('solscanApiKey') || '',
-            coinGecko: localStorage.getItem('coinGeckoApiKey') || ''
+        let currentPrices = {};
+        let holdings = {};
+        let nftHoldings = {};
+        
+        // 現在価格（デモ用）
+        const DEFAULT_PRICES = {
+            'BTC': 6500000,
+            'ETH': 380000,
+            'SOL': 22000,
+            'MATIC': 180,
+            'USDT': 150,
+            'USDC': 150,
+            'UNI': 1500,
+            'CRV': 120,
+            'AAVE': 15000,
+            'SUSHI': 200
         };
-        
-        // DeFiプロトコルのアドレス（Ethereum）
-        const DEFI_PROTOCOLS = {
-            '0x7a250d5630b4cf539739df2c5dacb4c659f2488d': 'Uniswap V2',
-            '0xe592427a0aece92de3edee1f18e0157c05861564': 'Uniswap V3',
-            '0xd9e1ce17f2641f24ae83637ab66a2cca9c378b9f': 'SushiSwap',
-            '0x7d2768de32b0b80b7a3454c06bdac94a69ddc7a9': 'Aave V2',
-            '0x87870bca3f3fd6335c3f4ce8392d69350b4fa4e2': 'Aave V3',
-            '0xae7ab96520de3a18e5e111b5eaab095312d7fe84': 'Lido',
-            '0x1111111254fb6c44bac0bed2854e76f90643097d': '1inch',
-            '0xbebc44782c7db0a1a60cb6fe97d0b483032ff1c7': 'Curve 3Pool'
-        };
-        
-        // NFTマーケットプレイスのアドレス（Ethereum）
-        const NFT_MARKETPLACES = {
-            '0x7be8076f4ea4a4ad08075c2508e481d6c946d12b': 'OpenSea',
-            '0x7f268357a8c2552623316e2562d90e642bb538e5': 'OpenSea V2',
-            '0x00000000006c3852cbef3e08e8df289169ede581': 'OpenSea Seaport',
-            '0x74312363e45dcaba76c59ec49a7aa8a65a67eed3': 'X2Y2',
-            '0x59728544b08ab483533076417fbbb2fd0b17ce3a': 'LooksRare',
-            '0xf849de01b080adc3a814fabe1e2087475cf2e354': 'X2Y2 V2'
-        };
-        
-        // Solana NFTマーケットプレイス
-        const SOLANA_NFT_MARKETPLACES = {
-            'MEisE1HzehtrDpAAT8PiLLjpSSkRYakotTuJRPjTpo8': 'Magic Eden',
-            'CJsLwbP1iu5DuUikHEJnLfANgKy6stB2uFgvBBHoyxwz': 'Solanart',
-            'A7p8451ktDCHq5yYaHczeLMYsjRsAkzc3hCXcSrwYHU7': 'Digital Eyes',
-            'hausS13jsjafwWwGqZTUQRmWyvyxn9EQpqMwV1PBBmk': 'Magic Eden V2'
-        };
-        
-        // DOM要素の取得
-        const connectMetaMaskBtn = document.getElementById('connectMetaMaskBtn');
-        const connectPhantomBtn = document.getElementById('connectPhantomBtn');
-        const importCsvBtn = document.getElementById('importCsvBtn');
-        const manualInputBtn = document.getElementById('manualInputBtn');
-        const csvFile = document.getElementById('csvFile');
-        const connectedWalletDiv = document.getElementById('connectedWallet');
-        const walletTypeDiv = document.getElementById('walletType');
-        const walletAddressDiv = document.getElementById('walletAddress');
-        const fetchTransactionsBtn = document.getElementById('fetchTransactionsBtn');
-        const disconnectBtn = document.getElementById('disconnectBtn');
-        const loadingIndicator = document.getElementById('loadingIndicator');
-        const manualModal = document.getElementById('manualModal');
-        const closeModal = document.getElementById('closeModal');
-        const manualForm = document.getElementById('manualForm');
-        const taxForm = document.getElementById('taxForm');
-        const filterType = document.getElementById('filterType');
-        const transactionList = document.getElementById('transactionList');
-        const txCount = document.getElementById('txCount');
-        const resultsSection = document.getElementById('resultsSection');
-        const exportResultsBtn = document.getElementById('exportResultsBtn');
-        const printResultsBtn = document.getElementById('printResultsBtn');
-        const saveApiKeysBtn = document.getElementById('saveApiKeysBtn');
-        const etherscanApiInput = document.getElementById('etherscanApi');
-        const solscanApiInput = document.getElementById('solscanApi');
-        const coinGeckoApiInput = document.getElementById('coinGeckoApi');
-        const apiStatus = document.getElementById('apiStatus');
-        const manualTypeSelect = document.getElementById('manualType');
-        const nftFields = document.getElementById('nftFields');
-        const nftTokenId = document.getElementById('nftTokenId');
-        
-        // イベントリスナーの設定
-        connectMetaMaskBtn.addEventListener('click', connectMetaMask);
-        connectPhantomBtn.addEventListener('click', connectPhantom);
-        importCsvBtn.addEventListener('click', () => csvFile.click());
-        manualInputBtn.addEventListener('click', showManualInput);
-        csvFile.addEventListener('change', importCSV);
-        fetchTransactionsBtn.addEventListener('click', fetchTransactions);
-        disconnectBtn.addEventListener('click', disconnectWallet);
-        closeModal.addEventListener('click', hideManualInput);
-        manualForm.addEventListener('submit', addManualTransaction);
-        taxForm.addEventListener('submit', calculateTax);
-        filterType.addEventListener('change', displayTransactions);
-        exportResultsBtn.addEventListener('click', exportResultsCSV);
-        printResultsBtn.addEventListener('click', () => window.print());
-        saveApiKeysBtn.addEventListener('click', saveApiKeys);
-        manualTypeSelect.addEventListener('change', updateManualFormFields);
-        
-        // 手動入力フォームのフィールド更新
-        function updateManualFormFields() {
-            const type = manualTypeSelect.value;
-            const isNftTransaction = type.startsWith('nft-');
-            
-            if (isNftTransaction) {
-                nftFields.style.display = 'block';
-                nftTokenId.style.display = 'block';
-                document.getElementById('manualCurrency').placeholder = 'CryptoPunks, BAYC, Azuki等';
-                document.getElementById('manualAmount').placeholder = 'トークンID (例: 1234)';
-            } else {
-                nftFields.style.display = 'none';
-                nftTokenId.style.display = 'none';
-                document.getElementById('manualCurrency').placeholder = 'BTC, ETH, SOL等';
-                document.getElementById('manualAmount').placeholder = '数量';
-            }
-        }
         
         // サンプルデータ生成関数
         function generateSampleData(walletType = 'ethereum') {
@@ -941,6 +1164,16 @@
                     hash: '0x' + Math.random().toString(36).substr(2, 9)
                 },
                 {
+                    date: `${currentYear}-01-08`,
+                    type: 'buy',
+                    currency: 'AAVE',
+                    amount: 10,
+                    price: 15000,
+                    totalJPY: 150000,
+                    fee: 2000,
+                    hash: '0x' + Math.random().toString(36).substr(2, 9)
+                },
+                {
                     date: `${currentYear-1}-12-20`,
                     type: 'transfer-out',
                     currency: baseData.currency,
@@ -969,7 +1202,7 @@
                     type: 'nft-buy',
                     currency: 'CryptoPunks',
                     amount: 1,
-                    price: 15000000, // 15 ETH相当
+                    price: 15000000,
                     totalJPY: 15000000,
                     fee: 50000,
                     nftCollection: 'CryptoPunks',
@@ -979,10 +1212,10 @@
                 },
                 {
                     date: `${currentYear}-01-18`,
-                    type: 'nft-sell',
+                    type: 'nft-buy',
                     currency: 'BAYC',
                     amount: 1,
-                    price: 8000000, // 8 ETH相当
+                    price: 8000000,
                     totalJPY: 8000000,
                     fee: 40000,
                     nftCollection: 'Bored Ape Yacht Club',
@@ -995,24 +1228,36 @@
                     type: 'nft-mint',
                     currency: 'Azuki',
                     amount: 1,
-                    price: 300000, // ミント価格
+                    price: 300000,
                     totalJPY: 300000,
                     fee: 20000,
                     nftCollection: 'Azuki',
                     tokenId: '5432',
                     marketplace: 'Direct Mint',
                     hash: '0x' + Math.random().toString(36).substr(2, 9)
+                },
+                {
+                    date: `${currentYear-1}-12-15`,
+                    type: 'nft-sell',
+                    currency: 'BAYC',
+                    amount: 1,
+                    price: 9000000,
+                    totalJPY: 9000000,
+                    fee: 45000,
+                    nftCollection: 'Bored Ape Yacht Club',
+                    tokenId: '3333',
+                    marketplace: 'OpenSea',
+                    hash: '0x' + Math.random().toString(36).substr(2, 9)
                 }
             ];
             
             if (walletType === 'solana') {
-                // Solana NFTのサンプル
                 nftTransactions.push({
                     date: `${currentYear}-01-08`,
                     type: 'nft-buy',
                     currency: 'DeGods',
                     amount: 1,
-                    price: 2200000, // 100 SOL相当
+                    price: 2200000,
                     totalJPY: 2200000,
                     fee: 5000,
                     nftCollection: 'DeGods',
@@ -1025,52 +1270,353 @@
             return [...basicTransactions, ...nftTransactions];
         }
         
+        // DOM要素の取得
+        const connectMetaMaskBtn = document.getElementById('connectMetaMaskBtn');
+        const connectPhantomBtn = document.getElementById('connectPhantomBtn');
+        const importCsvBtn = document.getElementById('importCsvBtn');
+        const manualInputBtn = document.getElementById('manualInputBtn');
+        const csvFile = document.getElementById('csvFile');
+        const connectedWalletDiv = document.getElementById('connectedWallet');
+        const walletTypeDiv = document.getElementById('walletType');
+        const walletAddressDiv = document.getElementById('walletAddress');
+        const fetchTransactionsBtn = document.getElementById('fetchTransactionsBtn');
+        const disconnectBtn = document.getElementById('disconnectBtn');
+        const loadingIndicator = document.getElementById('loadingIndicator');
+        const manualModal = document.getElementById('manualModal');
+        const closeModal = document.getElementById('closeModal');
+        const manualForm = document.getElementById('manualForm');
+        const taxForm = document.getElementById('taxForm');
+        const filterType = document.getElementById('filterType');
+        const transactionList = document.getElementById('transactionList');
+        const txCount = document.getElementById('txCount');
+        const resultsSection = document.getElementById('resultsSection');
+        const exportResultsBtn = document.getElementById('exportResultsBtn');
+        const printResultsBtn = document.getElementById('printResultsBtn');
+        const manualTypeSelect = document.getElementById('manualType');
+        const nftFields = document.getElementById('nftFields');
+        const nftTokenId = document.getElementById('nftTokenId');
+        
+        // イベントリスナーの設定
+        connectMetaMaskBtn.addEventListener('click', connectMetaMask);
+        connectPhantomBtn.addEventListener('click', connectPhantom);
+        importCsvBtn.addEventListener('click', () => csvFile.click());
+        manualInputBtn.addEventListener('click', showManualInput);
+        csvFile.addEventListener('change', importCSV);
+        fetchTransactionsBtn.addEventListener('click', fetchTransactions);
+        disconnectBtn.addEventListener('click', disconnectWallet);
+        closeModal.addEventListener('click', hideManualInput);
+        manualForm.addEventListener('submit', addManualTransaction);
+        taxForm.addEventListener('submit', calculateTax);
+        filterType.addEventListener('change', displayTransactions);
+        exportResultsBtn.addEventListener('click', exportResultsCSV);
+        printResultsBtn.addEventListener('click', () => window.print());
+        manualTypeSelect.addEventListener('change', updateManualFormFields);
+        
+        // タブ切り替え
+        function switchTab(tabName) {
+            // すべてのタブコンテンツを非表示
+            document.querySelectorAll('.tab-content').forEach(tab => {
+                tab.classList.remove('active');
+            });
+            
+            // すべてのタブボタンから active を削除
+            document.querySelectorAll('.tab-button').forEach(button => {
+                button.classList.remove('active');
+            });
+            
+            // 選択されたタブを表示
+            document.getElementById(tabName + 'Tab').classList.add('active');
+            
+            // 選択されたタブボタンに active を追加
+            event.target.classList.add('active');
+            
+            // ポートフォリオタブが選択された場合、保有資産を計算
+            if (tabName === 'portfolio') {
+                calculateHoldings();
+            }
+        }
+        
+        // 保有資産の計算
+        function calculateHoldings() {
+            holdings = {};
+            nftHoldings = {};
+            
+            // 取引履歴から現在の保有資産を計算
+            const sortedTransactions = [...transactions].sort((a, b) => new Date(a.date) - new Date(b.date));
+            
+            sortedTransactions.forEach(tx => {
+                if (tx.type.startsWith('nft-')) {
+                    // NFT取引の処理
+                    const nftKey = `${tx.nftCollection || tx.currency}-${tx.tokenId || tx.amount}`;
+                    
+                    if (tx.type === 'nft-buy' || tx.type === 'nft-mint') {
+                        nftHoldings[nftKey] = {
+                            collection: tx.nftCollection || tx.currency,
+                            tokenId: tx.tokenId || tx.amount,
+                            acquiredDate: tx.date,
+                            acquiredPrice: tx.totalJPY,
+                            currentPrice: tx.totalJPY * 1.1, // デモ用：10%上昇と仮定
+                            marketplace: tx.marketplace
+                        };
+                    } else if (tx.type === 'nft-sell' || tx.type === 'nft-transfer') {
+                        delete nftHoldings[nftKey];
+                    }
+                } else {
+                    // 仮想通貨取引の処理
+                    if (!holdings[tx.currency]) {
+                        holdings[tx.currency] = {
+                            amount: 0,
+                            totalCost: 0,
+                            averageCost: 0
+                        };
+                    }
+                    
+                    if (tx.type === 'buy' || tx.type === 'transfer-in' || 
+                        tx.type === 'staking' || tx.type === 'defi') {
+                        holdings[tx.currency].amount += tx.amount;
+                        holdings[tx.currency].totalCost += tx.totalJPY;
+                    } else if (tx.type === 'sell' || tx.type === 'transfer-out') {
+                        const avgCost = holdings[tx.currency].totalCost / holdings[tx.currency].amount || 0;
+                        const soldCost = avgCost * tx.amount;
+                        
+                        holdings[tx.currency].amount -= tx.amount;
+                        holdings[tx.currency].totalCost -= soldCost;
+                        
+                        if (holdings[tx.currency].amount <= 0.00000001) {
+                            delete holdings[tx.currency];
+                        }
+                    }
+                }
+            });
+            
+            // 平均取得単価を計算
+            Object.keys(holdings).forEach(currency => {
+                if (holdings[currency].amount > 0) {
+                    holdings[currency].averageCost = holdings[currency].totalCost / holdings[currency].amount;
+                } else {
+                    delete holdings[currency];
+                }
+            });
+            
+            // 現在価格を取得（デモ用）
+            updateCurrentPrices();
+            
+            // ポートフォリオ表示を更新
+            updatePortfolioDisplay();
+        }
+        
+        // 現在価格の更新（デモ用）
+        function updateCurrentPrices() {
+            Object.keys(holdings).forEach(currency => {
+                currentPrices[currency] = DEFAULT_PRICES[currency] || 
+                    (holdings[currency].averageCost * (0.8 + Math.random() * 0.4)); // ±20%のランダム変動
+            });
+        }
+        
+        // ポートフォリオ表示の更新
+        function updatePortfolioDisplay() {
+            let totalCryptoValue = 0;
+            let totalNftValue = 0;
+            
+            // 仮想通貨保有一覧
+            const cryptoList = document.getElementById('cryptoHoldingsList');
+            if (Object.keys(holdings).length === 0) {
+                cryptoList.innerHTML = '<p style="text-align: center; color: #999;">保有データがありません</p>';
+            } else {
+                cryptoList.innerHTML = Object.entries(holdings).map(([currency, data]) => {
+                    const currentPrice = currentPrices[currency] || data.averageCost;
+                    const currentValue = data.amount * currentPrice;
+                    const profit = currentValue - data.totalCost;
+                    const profitPercent = (profit / data.totalCost * 100).toFixed(2);
+                    
+                    totalCryptoValue += currentValue;
+                    
+                    return `
+                        <div class="holding-item">
+                            <div class="holding-header">
+                                <span class="holding-name">${currency}</span>
+                                <span class="holding-value">¥${currentValue.toLocaleString()}</span>
+                            </div>
+                            <div class="holding-details">
+                                <div class="holding-detail">
+                                    <span class="holding-label">保有数量</span>
+                                    <span class="holding-detail-value">${data.amount.toFixed(8)}</span>
+                                </div>
+                                <div class="holding-detail">
+                                    <span class="holding-label">平均取得単価</span>
+                                    <span class="holding-detail-value">¥${data.averageCost.toLocaleString()}</span>
+                                </div>
+                                <div class="holding-detail">
+                                    <span class="holding-label">現在価格</span>
+                                    <span class="holding-detail-value">¥${currentPrice.toLocaleString()}</span>
+                                </div>
+                                <div class="holding-detail">
+                                    <span class="holding-label">損益</span>
+                                    <span class="holding-detail-value ${profit >= 0 ? 'profit' : 'loss'}">
+                                        ${profit >= 0 ? '+' : ''}¥${profit.toLocaleString()} (${profitPercent}%)
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                }).join('');
+            }
+            
+            // NFT保有一覧
+            const nftList = document.getElementById('nftHoldingsList');
+            const nftGallery = document.getElementById('nftGallery');
+            
+            if (Object.keys(nftHoldings).length === 0) {
+                nftList.innerHTML = '<p style="text-align: center; color: #999;">保有NFTがありません</p>';
+                nftGallery.innerHTML = '<p style="text-align: center; color: #999; grid-column: 1 / -1;">NFTがありません</p>';
+            } else {
+                nftList.innerHTML = Object.entries(nftHoldings).map(([key, nft]) => {
+                    const profit = nft.currentPrice - nft.acquiredPrice;
+                    const profitPercent = (profit / nft.acquiredPrice * 100).toFixed(2);
+                    
+                    totalNftValue += nft.currentPrice;
+                    
+                    return `
+                        <div class="holding-item nft">
+                            <div class="holding-header">
+                                <span class="holding-name">${nft.collection} #${nft.tokenId}</span>
+                                <span class="holding-value">¥${nft.currentPrice.toLocaleString()}</span>
+                            </div>
+                            <div class="holding-details">
+                                <div class="holding-detail">
+                                    <span class="holding-label">取得日</span>
+                                    <span class="holding-detail-value">${formatDate(nft.acquiredDate)}</span>
+                                </div>
+                                <div class="holding-detail">
+                                    <span class="holding-label">取得価格</span>
+                                    <span class="holding-detail-value">¥${nft.acquiredPrice.toLocaleString()}</span>
+                                </div>
+                                <div class="holding-detail">
+                                    <span class="holding-label">損益</span>
+                                    <span class="holding-detail-value ${profit >= 0 ? 'profit' : 'loss'}">
+                                        ${profit >= 0 ? '+' : ''}¥${profit.toLocaleString()} (${profitPercent}%)
+                                    </span>
+                                </div>
+                                <div class="holding-detail">
+                                    <span class="holding-label">取得場所</span>
+                                    <span class="holding-detail-value">${nft.marketplace}</span>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                }).join('');
+                
+                // NFTギャラリー
+                nftGallery.innerHTML = Object.entries(nftHoldings).map(([key, nft]) => `
+                    <div class="nft-card">
+                        <div class="nft-image">🎨</div>
+                        <div class="nft-name">${nft.collection}</div>
+                        <div class="nft-token-id">#${nft.tokenId}</div>
+                        <div class="nft-value">¥${nft.currentPrice.toLocaleString()}</div>
+                    </div>
+                `).join('');
+            }
+            
+            // 合計資産価値の更新
+            const totalValue = totalCryptoValue + totalNftValue;
+            document.getElementById('totalAssetValue').textContent = '¥' + totalValue.toLocaleString();
+            document.getElementById('cryptoAssetValue').textContent = '¥' + totalCryptoValue.toLocaleString();
+            document.getElementById('nftAssetValue').textContent = '¥' + totalNftValue.toLocaleString();
+            document.getElementById('totalValueInTax').textContent = '¥' + totalValue.toLocaleString();
+        }
+        
+        // ポートフォリオのリフレッシュ
+        async function refreshPortfolio() {
+            showMessage('価格を更新しています...', 'info');
+            
+            // デモ用：価格をランダムに変動させる
+            Object.keys(holdings).forEach(currency => {
+                const basePrice = DEFAULT_PRICES[currency] || holdings[currency].averageCost;
+                currentPrices[currency] = basePrice * (0.9 + Math.random() * 0.2); // ±10%の変動
+            });
+            
+            Object.keys(nftHoldings).forEach(key => {
+                const nft = nftHoldings[key];
+                nft.currentPrice = nft.acquiredPrice * (0.8 + Math.random() * 0.4); // ±20%の変動
+            });
+            
+            updatePortfolioDisplay();
+            showMessage('価格を更新しました', 'success');
+        }
+        
+        // ポートフォリオのエクスポート
+        function exportPortfolio() {
+            let csv = '\ufeff'; // BOM
+            csv += '暗号資産・NFTポートフォリオレポート\n\n';
+            csv += `作成日,${new Date().toLocaleDateString('ja-JP')}\n\n`;
+            
+            csv += '仮想通貨保有一覧\n';
+            csv += '通貨,保有数量,平均取得単価,現在価格,現在価値,損益,損益率\n';
+            
+            Object.entries(holdings).forEach(([currency, data]) => {
+                const currentPrice = currentPrices[currency] || data.averageCost;
+                const currentValue = data.amount * currentPrice;
+                const profit = currentValue - data.totalCost;
+                const profitPercent = (profit / data.totalCost * 100).toFixed(2);
+                
+                csv += `${currency},${data.amount},${data.averageCost},${currentPrice},${currentValue},${profit},${profitPercent}%\n`;
+            });
+            
+            csv += '\nNFT保有一覧\n';
+            csv += 'コレクション,トークンID,取得日,取得価格,現在価値,損益,損益率,取得場所\n';
+            
+            Object.entries(nftHoldings).forEach(([key, nft]) => {
+                const profit = nft.currentPrice - nft.acquiredPrice;
+                const profitPercent = (profit / nft.acquiredPrice * 100).toFixed(2);
+                
+                csv += `${nft.collection},${nft.tokenId},${nft.acquiredDate},${nft.acquiredPrice},${nft.currentPrice},${profit},${profitPercent}%,${nft.marketplace}\n`;
+            });
+            
+            downloadCSV(csv, `portfolio_${new Date().toISOString().split('T')[0]}.csv`);
+            showMessage('ポートフォリオをエクスポートしました', 'success');
+        }
+        
+        // 手動入力フォームのフィールド更新
+        function updateManualFormFields() {
+            const type = manualTypeSelect.value;
+            const isNftTransaction = type.startsWith('nft-');
+            
+            if (isNftTransaction) {
+                nftFields.style.display = 'block';
+                nftTokenId.style.display = 'block';
+                document.getElementById('manualCurrency').placeholder = 'CryptoPunks, BAYC, Azuki等';
+                document.getElementById('manualAmount').placeholder = 'トークンID (例: 1234)';
+            } else {
+                nftFields.style.display = 'none';
+                nftTokenId.style.display = 'none';
+                document.getElementById('manualCurrency').placeholder = 'BTC, ETH, SOL等';
+                document.getElementById('manualAmount').placeholder = '数量';
+            }
+        }
+        
         // MetaMask接続
         async function connectMetaMask() {
             try {
                 showLoading(true);
                 
                 if (typeof window.ethereum === 'undefined' || !window.ethereum.isMetaMask) {
-                    const useDemo = confirm('MetaMaskが検出されませんでした。\n\nデモモードで続行しますか？\n（実際のブロックチェーンデータではなく、サンプルデータが表示されます）');
+                    const useDemo = confirm('MetaMaskが検出されませんでした。\n\nデモモードで続行しますか？');
                     if (useDemo) {
                         await connectDemoWallet('MetaMask');
-                    } else {
-                        showMessage('MetaMask拡張機能をインストールしてください', 'warning');
-                        window.open('https://metamask.io/download/', '_blank');
                     }
                     return;
                 }
                 
-                // アカウント接続要求
                 const accounts = await window.ethereum.request({ 
                     method: 'eth_requestAccounts' 
                 });
                 
-                if (accounts.length === 0) {
-                    throw new Error('アカウントが見つかりません');
-                }
-                
                 walletAddress = accounts[0];
                 updateWalletUI(true, 'MetaMask', walletAddress);
-                
-                // アカウント変更の監視
-                window.ethereum.on('accountsChanged', (accounts) => {
-                    if (accounts.length === 0) {
-                        disconnectWallet();
-                    } else {
-                        walletAddress = accounts[0];
-                        updateWalletUI(true, 'MetaMask', walletAddress);
-                    }
-                });
-                
                 showMessage('MetaMaskが正常に接続されました', 'success');
                 
             } catch (error) {
-                if (error.code === 4001) {
-                    showMessage('接続がキャンセルされました', 'warning');
-                } else {
-                    showMessage('接続エラー: ' + error.message, 'error');
-                }
+                showMessage('接続エラー: ' + error.message, 'error');
             } finally {
                 showLoading(false);
             }
@@ -1094,27 +1640,16 @@
                 const provider = getProvider();
                 
                 if (!provider) {
-                    const useDemo = confirm('Phantomが検出されませんでした。\n\nデモモードで続行しますか？\n（実際のブロックチェーンデータではなく、サンプルデータが表示されます）');
+                    const useDemo = confirm('Phantomが検出されませんでした。\n\nデモモードで続行しますか？');
                     if (useDemo) {
                         await connectDemoWallet('Phantom');
-                    } else {
-                        showMessage('Phantom拡張機能をインストールしてください', 'warning');
-                        window.open('https://phantom.app/', '_blank');
                     }
                     return;
                 }
                 
-                // 接続要求
                 const resp = await provider.connect();
                 walletAddress = resp.publicKey.toString();
-                
                 updateWalletUI(true, 'Phantom', walletAddress);
-                
-                // 切断イベントの監視
-                provider.on('disconnect', () => {
-                    disconnectWallet();
-                });
-                
                 showMessage('Phantomが正常に接続されました', 'success');
                 
             } catch (error) {
@@ -1142,56 +1677,18 @@
             transactions = generateSampleData(type === 'MetaMask' ? 'ethereum' : 'solana');
             updateStats();
             displayTransactions();
+            calculateHoldings();
             showMessage(`${type}が接続されました（デモモード）`, 'success');
             showLoading(false);
         }
         
-        // APIキー保存
-        function saveApiKeys() {
-            apiKeys.etherscan = etherscanApiInput.value.trim();
-            apiKeys.solscan = solscanApiInput.value.trim();
-            apiKeys.coinGecko = coinGeckoApiInput.value.trim();
-            
-            localStorage.setItem('etherscanApiKey', apiKeys.etherscan);
-            localStorage.setItem('solscanApiKey', apiKeys.solscan);
-            localStorage.setItem('coinGeckoApiKey', apiKeys.coinGecko);
-            
-            updateApiStatus();
-            showMessage('APIキーを保存しました', 'success');
-        }
-        
-        // APIステータス更新
-        function updateApiStatus() {
-            const hasEtherscan = apiKeys.etherscan.length > 0;
-            const hasSolscan = apiKeys.solscan.length > 0;
-            
-            if (hasEtherscan || hasSolscan) {
-                apiStatus.textContent = `保存済み: ${hasEtherscan ? 'Etherscan' : ''}${hasEtherscan && hasSolscan ? ', ' : ''}${hasSolscan ? 'Solscan' : ''}`;
-                apiStatus.style.color = '#4CAF50';
-            } else {
-                apiStatus.textContent = 'APIキーが保存されていません';
-                apiStatus.style.color = '#f44336';
-            }
-        }
-        
         // 取引履歴取得
         async function fetchTransactions() {
-            const fetchProgress = document.getElementById('fetchProgress');
-            const fetchStatus = document.getElementById('fetchStatus');
-            const progressBar = document.getElementById('progressBar');
-            
             try {
                 showLoading(true);
-                fetchProgress.style.display = 'block';
-                progressBar.style.width = '0%';
                 
                 if (connectedWallet && connectedWallet.isDemo) {
                     // デモモードの場合、追加のサンプルデータを生成
-                    fetchStatus.textContent = 'デモデータを生成中...';
-                    progressBar.style.width = '50%';
-                    
-                    await new Promise(resolve => setTimeout(resolve, 1000));
-                    
                     const additionalTx = [
                         {
                             date: '2025-01-25',
@@ -1217,327 +1714,18 @@
                         }
                     ];
                     
-                    progressBar.style.width = '100%';
-                    fetchStatus.textContent = '完了！';
-                    
                     transactions.push(...additionalTx);
                     updateStats();
                     displayTransactions();
+                    calculateHoldings();
                     showMessage('追加の取引データを取得しました（デモモード）', 'success');
-                    return;
-                }
-                
-                // 実際のブロックチェーンから取引履歴を取得
-                if (connectedWallet.type === 'MetaMask') {
-                    if (!apiKeys.etherscan) {
-                        showMessage('Etherscan APIキーを設定してください', 'warning');
-                        return;
-                    }
-                    await fetchEthereumTransactions(walletAddress, fetchStatus, progressBar);
-                } else if (connectedWallet.type === 'Phantom') {
-                    await fetchSolanaTransactions(walletAddress, fetchStatus, progressBar);
-                }
-                
-                updateStats();
-                displayTransactions();
-                
-                if (transactions.length > 0) {
-                    showMessage(`${transactions.length}件の取引を取得しました`, 'success');
-                } else {
-                    showMessage('取引履歴が見つかりませんでした', 'warning');
                 }
                 
             } catch (error) {
                 showMessage('取引履歴の取得に失敗しました: ' + error.message, 'error');
-                console.error('Fetch error:', error);
             } finally {
                 showLoading(false);
-                setTimeout(() => {
-                    fetchProgress.style.display = 'none';
-                }, 2000);
             }
-        }
-        
-        // Ethereum取引履歴取得
-        async function fetchEthereumTransactions(address, statusEl, progressEl) {
-            const txList = [];
-            
-            try {
-                statusEl.textContent = 'Ethereum取引履歴を取得中...';
-                progressEl.style.width = '10%';
-                
-                // 通常のETH取引
-                const txUrl = `https://api.etherscan.io/api?module=account&action=txlist&address=${address}&startblock=0&endblock=99999999&sort=desc&apikey=${apiKeys.etherscan}`;
-                const txResponse = await fetch(txUrl);
-                const txData = await txResponse.json();
-                
-                if (txData.status === '1' && txData.result) {
-                    statusEl.textContent = `${txData.result.length}件のETH取引を処理中...`;
-                    progressEl.style.width = '40%';
-                    
-                    for (const tx of txData.result.slice(0, 100)) { // 最新100件
-                        if (parseFloat(tx.value) > 0) {
-                            const date = new Date(tx.timeStamp * 1000);
-                            const value = parseFloat(tx.value) / 1e18;
-                            const type = tx.from.toLowerCase() === address.toLowerCase() ? 'transfer-out' : 'transfer-in';
-                            
-                            // DeFiプロトコルチェック
-                            const protocol = DEFI_PROTOCOLS[tx.to?.toLowerCase()];
-                            
-                            // 価格取得
-                            const price = await getHistoricalPrice('ethereum', date);
-                            
-                            txList.push({
-                                date: date.toISOString().split('T')[0],
-                                type: protocol ? 'defi' : type,
-                                currency: 'ETH',
-                                amount: value,
-                                price: price,
-                                totalJPY: value * price,
-                                fee: (parseFloat(tx.gasUsed) * parseFloat(tx.gasPrice) / 1e18) * price,
-                                protocol: protocol,
-                                hash: tx.hash
-                            });
-                        }
-                    }
-                }
-                
-                // ERC20トークン取引
-                statusEl.textContent = 'ERC20トークン取引を取得中...';
-                progressEl.style.width = '70%';
-                
-                const tokenUrl = `https://api.etherscan.io/api?module=account&action=tokentx&address=${address}&startblock=0&endblock=99999999&sort=desc&apikey=${apiKeys.etherscan}`;
-                const tokenResponse = await fetch(tokenUrl);
-                const tokenData = await tokenResponse.json();
-                
-                if (tokenData.status === '1' && tokenData.result) {
-                    statusEl.textContent = `${tokenData.result.length}件のトークン取引を処理中...`;
-                    
-                    for (const tx of tokenData.result.slice(0, 100)) { // 最新100件
-                        const decimals = parseInt(tx.tokenDecimal);
-                        const value = parseFloat(tx.value) / Math.pow(10, decimals);
-                        
-                        if (value > 0) {
-                            const date = new Date(tx.timeStamp * 1000);
-                            const type = tx.from.toLowerCase() === address.toLowerCase() ? 'transfer-out' : 'transfer-in';
-                            
-                            // ステーキング報酬の検出
-                            const isStaking = tx.tokenSymbol.toLowerCase().includes('st') || 
-                                            tx.from === '0x0000000000000000000000000000000000000000';
-                            
-                            // DeFiプロトコルの検出
-                            const protocol = DEFI_PROTOCOLS[tx.to?.toLowerCase()] || DEFI_PROTOCOLS[tx.from?.toLowerCase()];
-                            
-                            // 価格取得（簡略化）
-                            let price = 1000; // デフォルト価格
-                            if (['USDT', 'USDC', 'DAI', 'BUSD'].includes(tx.tokenSymbol)) {
-                                price = 150; // 1ドル = 150円
-                            } else if (tx.tokenSymbol === 'WETH') {
-                                price = await getHistoricalPrice('ethereum', date);
-                            }
-                            
-                            txList.push({
-                                date: date.toISOString().split('T')[0],
-                                type: isStaking ? 'staking' : (protocol ? 'defi' : type),
-                                currency: tx.tokenSymbol,
-                                amount: value,
-                                price: price,
-                                totalJPY: value * price,
-                                fee: 0,
-                                protocol: protocol,
-                                hash: tx.hash
-                            });
-                        }
-                    }
-                }
-                
-                // NFT取引（ERC721/ERC1155）
-                statusEl.textContent = 'NFT取引を取得中...';
-                progressEl.style.width = '90%';
-                
-                const nftUrl = `https://api.etherscan.io/api?module=account&action=tokennfttx&address=${address}&startblock=0&endblock=99999999&sort=desc&apikey=${apiKeys.etherscan}`;
-                const nftResponse = await fetch(nftUrl);
-                const nftData = await nftResponse.json();
-                
-                if (nftData.status === '1' && nftData.result) {
-                    for (const tx of nftData.result.slice(0, 50)) { // 最新50件
-                        const date = new Date(tx.timeStamp * 1000);
-                        const isReceiving = tx.to.toLowerCase() === address.toLowerCase();
-                        const isSending = tx.from.toLowerCase() === address.toLowerCase();
-                        
-                        // NFTマーケットプレイスでの取引かチェック
-                        const marketplace = NFT_MARKETPLACES[tx.to?.toLowerCase()] || NFT_MARKETPLACES[tx.from?.toLowerCase()];
-                        
-                        let type = 'nft-transfer';
-                        if (marketplace) {
-                            type = isReceiving ? 'nft-buy' : 'nft-sell';
-                        } else if (tx.from === '0x0000000000000000000000000000000000000000') {
-                            type = 'nft-mint';
-                        }
-                        
-                        // NFT価格の推定（簡略化）
-                        let estimatedPrice = 1000000; // デフォルト100万円
-                        if (tx.tokenName?.toLowerCase().includes('punk')) {
-                            estimatedPrice = 15000000; // CryptoPunks
-                        } else if (tx.tokenName?.toLowerCase().includes('ape')) {
-                            estimatedPrice = 8000000; // BAYC
-                        } else if (tx.tokenName?.toLowerCase().includes('azuki')) {
-                            estimatedPrice = 2000000; // Azuki
-                        }
-                        
-                        txList.push({
-                            date: date.toISOString().split('T')[0],
-                            type: type,
-                            currency: tx.tokenName || 'NFT',
-                            amount: 1, // NFTは通常1個
-                            price: estimatedPrice,
-                            totalJPY: estimatedPrice,
-                            fee: 0,
-                            nftCollection: tx.tokenName,
-                            tokenId: tx.tokenID,
-                            marketplace: marketplace || 'Unknown',
-                            hash: tx.hash
-                        });
-                    }
-                }
-                
-                progressEl.style.width = '100%';
-                statusEl.textContent = '完了！';
-                
-            } catch (error) {
-                console.error('Ethereum fetch error:', error);
-                throw new Error('Ethereum取引履歴の取得に失敗しました: ' + error.message);
-            }
-            
-            transactions = txList;
-        }
-        
-        // Solana取引履歴取得
-        async function fetchSolanaTransactions(address, statusEl, progressEl) {
-            const txList = [];
-            
-            try {
-                statusEl.textContent = 'Solana取引履歴を取得中...';
-                progressEl.style.width = '10%';
-                
-                if (apiKeys.solscan) {
-                    // Solscan APIを使用
-                    const headers = {
-                        'Accept': 'application/json',
-                        'token': apiKeys.solscan
-                    };
-                    
-                    const txUrl = `https://public-api.solscan.io/account/transactions?account=${address}&limit=100`;
-                    const txResponse = await fetch(txUrl, { headers });
-                    
-                    if (txResponse.ok) {
-                        const txData = await txResponse.json();
-                        
-                        if (txData && txData.data) {
-                            statusEl.textContent = `${txData.data.length}件のSOL取引を処理中...`;
-                            progressEl.style.width = '60%';
-                            
-                            for (const tx of txData.data) {
-                                const date = new Date(tx.blockTime * 1000);
-                                
-                                // SOL取引
-                                if (tx.solTransfers && tx.solTransfers.length > 0) {
-                                    for (const transfer of tx.solTransfers) {
-                                        const isReceiving = transfer.destination === address;
-                                        const amount = parseFloat(transfer.amount) / 1e9;
-                                        
-                                        if (amount > 0) {
-                                            const isStaking = isReceiving && amount < 0.1;
-                                            const price = await getHistoricalPrice('solana', date);
-                                            
-                                            txList.push({
-                                                date: date.toISOString().split('T')[0],
-                                                type: isStaking ? 'staking' : (isReceiving ? 'transfer-in' : 'transfer-out'),
-                                                currency: 'SOL',
-                                                amount: amount,
-                                                price: price,
-                                                totalJPY: amount * price,
-                                                fee: (tx.fee || 0) / 1e9 * price,
-                                                protocol: isStaking ? 'Solana Staking' : null,
-                                                hash: tx.txHash
-                                            });
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                } else {
-                    // RPC経由で基本的な取引履歴を取得
-                    statusEl.textContent = 'Solscan APIキーを設定すると、より詳細な取引履歴を取得できます';
-                    progressEl.style.width = '50%';
-                    
-                    // 簡易的なRPC取得（実装は省略）
-                    const sampleSolanaTx = [
-                        {
-                            date: '2025-01-20',
-                            type: 'transfer-in',
-                            currency: 'SOL',
-                            amount: 2.5,
-                            price: 22000,
-                            totalJPY: 55000,
-                            fee: 0.000005 * 22000,
-                            hash: Math.random().toString(36).substr(2, 44)
-                        }
-                    ];
-                    txList.push(...sampleSolanaTx);
-                }
-                
-                progressEl.style.width = '100%';
-                statusEl.textContent = '完了！';
-                
-            } catch (error) {
-                console.error('Solana fetch error:', error);
-                throw new Error('Solana取引履歴の取得に失敗しました: ' + error.message);
-            }
-            
-            transactions = txList;
-        }
-        
-        // 価格取得
-        async function getHistoricalPrice(coin, date) {
-            const coinIds = {
-                'ethereum': 'ethereum',
-                'bitcoin': 'bitcoin',
-                'solana': 'solana'
-            };
-            
-            const coinId = coinIds[coin.toLowerCase()];
-            if (!coinId) return 1000; // デフォルト価格
-            
-            try {
-                // CoinGecko API（無料枠）
-                const dateStr = date.toISOString().split('T')[0];
-                const formattedDate = dateStr.split('-').reverse().join('-'); // DD-MM-YYYY
-                const url = `https://api.coingecko.com/api/v3/coins/${coinId}/history?date=${formattedDate}&localization=false`;
-                
-                const response = await fetch(url);
-                if (response.ok) {
-                    const data = await response.json();
-                    if (data.market_data && data.market_data.current_price) {
-                        return data.market_data.current_price.jpy || getDefaultPrice(coinId);
-                    }
-                }
-            } catch (error) {
-                console.warn('Price fetch error:', error);
-            }
-            
-            return getDefaultPrice(coinId);
-        }
-        
-        // デフォルト価格
-        function getDefaultPrice(coinId) {
-            const defaultPrices = {
-                'ethereum': 380000,
-                'bitcoin': 6500000,
-                'solana': 22000
-            };
-            return defaultPrices[coinId] || 1000;
         }
         
         // ウォレット接続状態の更新
@@ -1552,7 +1740,11 @@
                 connectedWallet = null;
                 walletAddress = null;
                 transactions = [];
+                holdings = {};
+                nftHoldings = {};
                 displayTransactions();
+                updateStats();
+                updatePortfolioDisplay();
             }
         }
         
@@ -1560,7 +1752,6 @@
         function disconnectWallet() {
             updateWalletUI(false);
             resultsSection.style.display = 'none';
-            updateStats();
             showMessage('ウォレットが切断されました', 'success');
         }
         
@@ -1568,7 +1759,7 @@
         function showManualInput() {
             manualModal.style.display = 'block';
             document.getElementById('manualDate').value = new Date().toISOString().split('T')[0];
-            updateManualFormFields(); // フォームフィールドを初期化
+            updateManualFormFields();
         }
         
         function hideManualInput() {
@@ -1597,7 +1788,6 @@
                 hash: 'MANUAL-' + Date.now()
             };
             
-            // NFT取引の場合は追加情報を含める
             if (type.startsWith('nft-')) {
                 transaction.nftCollection = document.getElementById('nftCollection').value || currency;
                 transaction.tokenId = document.getElementById('tokenId').value || amount.toString();
@@ -1608,10 +1798,10 @@
             transactions.sort((a, b) => new Date(b.date) - new Date(a.date));
             updateStats();
             displayTransactions();
+            calculateHoldings();
             hideManualInput();
             showMessage('取引が追加されました', 'success');
             
-            // ウォレット接続状態を更新（手動入力として）
             if (!connectedWallet) {
                 updateWalletUI(true, '手動入力', 'MANUAL-ENTRY');
             }
@@ -1647,6 +1837,7 @@
                     
                     updateStats();
                     displayTransactions();
+                    calculateHoldings();
                     updateWalletUI(true, 'CSVインポート', 'CSV-IMPORT');
                     showMessage('CSVファイルが正常にインポートされました', 'success');
                 } catch (error) {
@@ -1654,7 +1845,7 @@
                 }
             };
             reader.readAsText(file);
-            event.target.value = ''; // リセット
+            event.target.value = '';
         }
         
         // 取引履歴の表示
@@ -1753,7 +1944,6 @@
             const includeStaking = document.getElementById('includeStaking').checked;
             const includeNft = document.getElementById('includeNft').checked;
             
-            // 年度でフィルター
             let yearTransactions = transactions.filter(tx => 
                 tx.date.startsWith(year)
             );
@@ -1763,7 +1953,6 @@
                 return;
             }
             
-            // 計算対象のフィルタリング
             if (!includeDefi) {
                 yearTransactions = yearTransactions.filter(tx => tx.type !== 'defi');
             }
@@ -1774,39 +1963,33 @@
                 yearTransactions = yearTransactions.filter(tx => !tx.type.startsWith('nft-'));
             }
             
-            // 税金計算ロジック
             let totalProfit = 0;
             let totalLoss = 0;
             let totalFees = 0;
             let defiIncome = 0;
             let nftIncome = 0;
-            const holdings = {};
-            const nftHoldings = {}; // NFT専用の保有情報
+            const taxHoldings = {};
+            const taxNftHoldings = {};
             
-            // 日付順にソート
             yearTransactions.sort((a, b) => new Date(a.date) - new Date(b.date));
             
             yearTransactions.forEach(tx => {
-                // 手数料の集計
                 if (tx.fee) {
                     totalFees += tx.fee;
                 }
                 
-                // NFT取引の処理
                 if (tx.type.startsWith('nft-')) {
                     if (tx.type === 'nft-buy' || tx.type === 'nft-mint') {
-                        // NFT購入・ミント
                         const nftKey = `${tx.nftCollection || tx.currency}-${tx.tokenId || tx.amount}`;
-                        nftHoldings[nftKey] = {
+                        taxNftHoldings[nftKey] = {
                             collection: tx.nftCollection || tx.currency,
                             tokenId: tx.tokenId || tx.amount,
                             cost: tx.totalJPY,
                             acquiredDate: tx.date
                         };
                     } else if (tx.type === 'nft-sell') {
-                        // NFT売却
                         const nftKey = `${tx.nftCollection || tx.currency}-${tx.tokenId || tx.amount}`;
-                        const holding = nftHoldings[nftKey];
+                        const holding = taxNftHoldings[nftKey];
                         
                         if (holding) {
                             const profit = tx.totalJPY - holding.cost;
@@ -1816,37 +1999,32 @@
                             } else {
                                 totalLoss += Math.abs(profit);
                             }
-                            delete nftHoldings[nftKey];
+                            delete taxNftHoldings[nftKey];
                         } else {
-                            // 取得価額不明の場合は全額利益として計上
                             totalProfit += tx.totalJPY;
                             nftIncome += tx.totalJPY;
                         }
                     }
-                    return; // NFT取引はここで処理完了
+                    return;
                 }
                 
-                // 従来の暗号通貨取引処理
                 if (tx.type === 'defi' || tx.type === 'staking') {
                     defiIncome += tx.totalJPY;
                 }
                 
-                // 売買損益の計算
                 if (tx.type === 'buy' || tx.type === 'transfer-in') {
-                    // 購入・入金処理
-                    if (!holdings[tx.currency]) {
-                        holdings[tx.currency] = {
+                    if (!taxHoldings[tx.currency]) {
+                        taxHoldings[tx.currency] = {
                             amount: 0,
                             totalCost: 0
                         };
                     }
-                    holdings[tx.currency].amount += tx.amount;
-                    holdings[tx.currency].totalCost += tx.totalJPY;
+                    taxHoldings[tx.currency].amount += tx.amount;
+                    taxHoldings[tx.currency].totalCost += tx.totalJPY;
                     
                 } else if (tx.type === 'sell' || tx.type === 'transfer-out') {
-                    // 売却・出金処理
-                    if (holdings[tx.currency] && holdings[tx.currency].amount > 0) {
-                        const avgCost = holdings[tx.currency].totalCost / holdings[tx.currency].amount;
+                    if (taxHoldings[tx.currency] && taxHoldings[tx.currency].amount > 0) {
+                        const avgCost = taxHoldings[tx.currency].totalCost / taxHoldings[tx.currency].amount;
                         const cost = avgCost * tx.amount;
                         const profit = tx.totalJPY - cost;
                         
@@ -1856,19 +2034,17 @@
                             totalLoss += Math.abs(profit);
                         }
                         
-                        holdings[tx.currency].amount -= tx.amount;
-                        holdings[tx.currency].totalCost -= cost;
+                        taxHoldings[tx.currency].amount -= tx.amount;
+                        taxHoldings[tx.currency].totalCost -= cost;
                     }
                 }
             });
             
-            // 総合計算
             const totalIncome = totalProfit + defiIncome;
             const netProfit = totalIncome - totalLoss - totalFees;
             const taxableIncome = Math.max(0, netProfit);
             const estimatedTax = taxableIncome * taxRate;
             
-            // 結果表示
             document.getElementById('totalProfit').textContent = formatCurrency(totalProfit);
             document.getElementById('totalLoss').textContent = formatCurrency(totalLoss);
             document.getElementById('netProfit').textContent = formatCurrency(netProfit);
@@ -1888,7 +2064,7 @@
             const method = document.getElementById('taxMethod').value;
             const taxRate = document.getElementById('taxRate').value;
             
-            let csv = '\ufeff'; // BOM
+            let csv = '\ufeff';
             csv += '暗号資産・NFT税金計算レポート\n\n';
             csv += `計算日,${new Date().toLocaleDateString('ja-JP')}\n`;
             csv += `対象年度,${year}年\n`;
@@ -1985,20 +2161,8 @@
         document.addEventListener('DOMContentLoaded', () => {
             displayTransactions();
             updateStats();
-            updateManualFormFields(); // 手動入力フォームの初期化
-            
-            // 保存されたAPIキーを読み込み
-            if (apiKeys.etherscan) {
-                etherscanApiInput.value = apiKeys.etherscan;
-            }
-            if (apiKeys.solscan) {
-                solscanApiInput.value = apiKeys.solscan;
-            }
-            if (apiKeys.coinGecko) {
-                coinGeckoApiInput.value = apiKeys.coinGecko;
-            }
-            
-            updateApiStatus();
+            updateManualFormFields();
+            updatePortfolioDisplay();
         });
     </script>
 </body>
