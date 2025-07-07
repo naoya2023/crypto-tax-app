@@ -304,7 +304,10 @@
         .tx-type.transfer-in { background: #00BCD4; }
         .tx-type.transfer-out { background: #FF9800; }
         .tx-type.staking { background: #9C27B0; }
-        .tx-type.defi { background: #3F51B5; }
+        .tx-type.nft-buy { background: #FF5722; }
+        .tx-type.nft-sell { background: #E91E63; }
+        .tx-type.nft-mint { background: #9C27B0; }
+        .tx-type.nft-transfer { background: #607D8B; }
 
         .tx-details {
             display: grid;
@@ -608,6 +611,10 @@
                 <div class="value" id="defiTxCount">0</div>
             </div>
             <div class="stat-card">
+                <h3>NFT取引</h3>
+                <div class="value" id="nftTxCount">0</div>
+            </div>
+            <div class="stat-card">
                 <h3>ステーキング報酬</h3>
                 <div class="value" id="stakingTxCount">0</div>
             </div>
@@ -626,6 +633,10 @@
                         <option value="transfer-out">出金</option>
                         <option value="staking">ステーキング</option>
                         <option value="defi">DeFi</option>
+                        <option value="nft-buy">NFT購入</option>
+                        <option value="nft-sell">NFT売却</option>
+                        <option value="nft-mint">NFTミント</option>
+                        <option value="nft-transfer">NFT転送</option>
                     </select>
                 </div>
                 <div id="transactionList" class="transaction-list">
@@ -672,6 +683,10 @@
                             <input type="checkbox" id="includeStaking" checked>
                             <label for="includeStaking">ステーキング報酬を含める</label>
                         </div>
+                        <div class="checkbox-group">
+                            <input type="checkbox" id="includeNft" checked>
+                            <label for="includeNft">NFT取引を含める</label>
+                        </div>
                     </div>
                     
                     <button type="submit" class="btn">税金を計算</button>
@@ -702,6 +717,14 @@
                     <h3>推定税額</h3>
                     <div class="amount" id="estimatedTax">¥0</div>
                 </div>
+                <div class="result-card defi-card">
+                    <h3>DeFi/ステーキング収益</h3>
+                    <div class="amount" id="defiIncome">¥0</div>
+                </div>
+                <div class="result-card" style="background: linear-gradient(135deg, #FF5722, #E91E63);">
+                    <h3>NFT売買損益</h3>
+                    <div class="amount" id="nftIncome">¥0</div>
+                </div>
             </div>
             
             <div style="text-align: center; margin-top: 30px;">
@@ -730,15 +753,27 @@
                         <option value="transfer-out">出金（送金）</option>
                         <option value="staking">ステーキング報酬</option>
                         <option value="defi">DeFi収益</option>
+                        <option value="nft-buy">NFT購入</option>
+                        <option value="nft-sell">NFT売却</option>
+                        <option value="nft-mint">NFTミント</option>
+                        <option value="nft-transfer">NFT転送</option>
                     </select>
                 </div>
                 <div class="form-group">
-                    <label for="manualCurrency">通貨</label>
-                    <input type="text" id="manualCurrency" placeholder="BTC, ETH, SOL等" required>
+                    <label for="manualCurrency">通貨/NFTコレクション</label>
+                    <input type="text" id="manualCurrency" placeholder="BTC, ETH, SOL, CryptoPunks等" required>
                 </div>
                 <div class="form-group">
-                    <label for="manualAmount">数量</label>
-                    <input type="number" id="manualAmount" step="0.00000001" required>
+                    <label for="manualAmount">数量/トークンID</label>
+                    <input type="number" id="manualAmount" step="0.00000001" placeholder="数量またはNFTトークンID" required>
+                </div>
+                <div class="form-group" id="nftFields" style="display: none;">
+                    <label for="nftCollection">NFTコレクション名</label>
+                    <input type="text" id="nftCollection" placeholder="CryptoPunks, Bored Ape Yacht Club等">
+                </div>
+                <div class="form-group" id="nftTokenId" style="display: none;">
+                    <label for="tokenId">トークンID</label>
+                    <input type="text" id="tokenId" placeholder="1234">
                 </div>
                 <div class="form-group">
                     <label for="manualPrice">単価（JPY）</label>
@@ -776,6 +811,24 @@
             '0xbebc44782c7db0a1a60cb6fe97d0b483032ff1c7': 'Curve 3Pool'
         };
         
+        // NFTマーケットプレイスのアドレス（Ethereum）
+        const NFT_MARKETPLACES = {
+            '0x7be8076f4ea4a4ad08075c2508e481d6c946d12b': 'OpenSea',
+            '0x7f268357a8c2552623316e2562d90e642bb538e5': 'OpenSea V2',
+            '0x00000000006c3852cbef3e08e8df289169ede581': 'OpenSea Seaport',
+            '0x74312363e45dcaba76c59ec49a7aa8a65a67eed3': 'X2Y2',
+            '0x59728544b08ab483533076417fbbb2fd0b17ce3a': 'LooksRare',
+            '0xf849de01b080adc3a814fabe1e2087475cf2e354': 'X2Y2 V2'
+        };
+        
+        // Solana NFTマーケットプレイス
+        const SOLANA_NFT_MARKETPLACES = {
+            'MEisE1HzehtrDpAAT8PiLLjpSSkRYakotTuJRPjTpo8': 'Magic Eden',
+            'CJsLwbP1iu5DuUikHEJnLfANgKy6stB2uFgvBBHoyxwz': 'Solanart',
+            'A7p8451ktDCHq5yYaHczeLMYsjRsAkzc3hCXcSrwYHU7': 'Digital Eyes',
+            'hausS13jsjafwWwGqZTUQRmWyvyxn9EQpqMwV1PBBmk': 'Magic Eden V2'
+        };
+        
         // DOM要素の取得
         const connectMetaMaskBtn = document.getElementById('connectMetaMaskBtn');
         const connectPhantomBtn = document.getElementById('connectPhantomBtn');
@@ -803,6 +856,9 @@
         const solscanApiInput = document.getElementById('solscanApi');
         const coinGeckoApiInput = document.getElementById('coinGeckoApi');
         const apiStatus = document.getElementById('apiStatus');
+        const manualTypeSelect = document.getElementById('manualType');
+        const nftFields = document.getElementById('nftFields');
+        const nftTokenId = document.getElementById('nftTokenId');
         
         // イベントリスナーの設定
         connectMetaMaskBtn.addEventListener('click', connectMetaMask);
@@ -819,6 +875,25 @@
         exportResultsBtn.addEventListener('click', exportResultsCSV);
         printResultsBtn.addEventListener('click', () => window.print());
         saveApiKeysBtn.addEventListener('click', saveApiKeys);
+        manualTypeSelect.addEventListener('change', updateManualFormFields);
+        
+        // 手動入力フォームのフィールド更新
+        function updateManualFormFields() {
+            const type = manualTypeSelect.value;
+            const isNftTransaction = type.startsWith('nft-');
+            
+            if (isNftTransaction) {
+                nftFields.style.display = 'block';
+                nftTokenId.style.display = 'block';
+                document.getElementById('manualCurrency').placeholder = 'CryptoPunks, BAYC, Azuki等';
+                document.getElementById('manualAmount').placeholder = 'トークンID (例: 1234)';
+            } else {
+                nftFields.style.display = 'none';
+                nftTokenId.style.display = 'none';
+                document.getElementById('manualCurrency').placeholder = 'BTC, ETH, SOL等';
+                document.getElementById('manualAmount').placeholder = '数量';
+            }
+        }
         
         // サンプルデータ生成関数
         function generateSampleData(walletType = 'ethereum') {
@@ -832,7 +907,7 @@
 
             const currentYear = new Date().getFullYear();
             
-            return [
+            const basicTransactions = [
                 {
                     date: `${currentYear}-01-20`,
                     type: 'buy',
@@ -886,6 +961,68 @@
                     hash: '0x' + Math.random().toString(36).substr(2, 9)
                 }
             ];
+            
+            // NFT取引のサンプルデータ
+            const nftTransactions = [
+                {
+                    date: `${currentYear}-01-25`,
+                    type: 'nft-buy',
+                    currency: 'CryptoPunks',
+                    amount: 1,
+                    price: 15000000, // 15 ETH相当
+                    totalJPY: 15000000,
+                    fee: 50000,
+                    nftCollection: 'CryptoPunks',
+                    tokenId: '7804',
+                    marketplace: 'OpenSea',
+                    hash: '0x' + Math.random().toString(36).substr(2, 9)
+                },
+                {
+                    date: `${currentYear}-01-18`,
+                    type: 'nft-sell',
+                    currency: 'BAYC',
+                    amount: 1,
+                    price: 8000000, // 8 ETH相当
+                    totalJPY: 8000000,
+                    fee: 40000,
+                    nftCollection: 'Bored Ape Yacht Club',
+                    tokenId: '9876',
+                    marketplace: 'OpenSea',
+                    hash: '0x' + Math.random().toString(36).substr(2, 9)
+                },
+                {
+                    date: `${currentYear}-01-12`,
+                    type: 'nft-mint',
+                    currency: 'Azuki',
+                    amount: 1,
+                    price: 300000, // ミント価格
+                    totalJPY: 300000,
+                    fee: 20000,
+                    nftCollection: 'Azuki',
+                    tokenId: '5432',
+                    marketplace: 'Direct Mint',
+                    hash: '0x' + Math.random().toString(36).substr(2, 9)
+                }
+            ];
+            
+            if (walletType === 'solana') {
+                // Solana NFTのサンプル
+                nftTransactions.push({
+                    date: `${currentYear}-01-08`,
+                    type: 'nft-buy',
+                    currency: 'DeGods',
+                    amount: 1,
+                    price: 2200000, // 100 SOL相当
+                    totalJPY: 2200000,
+                    fee: 5000,
+                    nftCollection: 'DeGods',
+                    tokenId: '1234',
+                    marketplace: 'Magic Eden',
+                    hash: Math.random().toString(36).substr(2, 44)
+                });
+            }
+            
+            return [...basicTransactions, ...nftTransactions];
         }
         
         // MetaMask接続
@@ -1214,6 +1351,56 @@
                     }
                 }
                 
+                // NFT取引（ERC721/ERC1155）
+                statusEl.textContent = 'NFT取引を取得中...';
+                progressEl.style.width = '90%';
+                
+                const nftUrl = `https://api.etherscan.io/api?module=account&action=tokennfttx&address=${address}&startblock=0&endblock=99999999&sort=desc&apikey=${apiKeys.etherscan}`;
+                const nftResponse = await fetch(nftUrl);
+                const nftData = await nftResponse.json();
+                
+                if (nftData.status === '1' && nftData.result) {
+                    for (const tx of nftData.result.slice(0, 50)) { // 最新50件
+                        const date = new Date(tx.timeStamp * 1000);
+                        const isReceiving = tx.to.toLowerCase() === address.toLowerCase();
+                        const isSending = tx.from.toLowerCase() === address.toLowerCase();
+                        
+                        // NFTマーケットプレイスでの取引かチェック
+                        const marketplace = NFT_MARKETPLACES[tx.to?.toLowerCase()] || NFT_MARKETPLACES[tx.from?.toLowerCase()];
+                        
+                        let type = 'nft-transfer';
+                        if (marketplace) {
+                            type = isReceiving ? 'nft-buy' : 'nft-sell';
+                        } else if (tx.from === '0x0000000000000000000000000000000000000000') {
+                            type = 'nft-mint';
+                        }
+                        
+                        // NFT価格の推定（簡略化）
+                        let estimatedPrice = 1000000; // デフォルト100万円
+                        if (tx.tokenName?.toLowerCase().includes('punk')) {
+                            estimatedPrice = 15000000; // CryptoPunks
+                        } else if (tx.tokenName?.toLowerCase().includes('ape')) {
+                            estimatedPrice = 8000000; // BAYC
+                        } else if (tx.tokenName?.toLowerCase().includes('azuki')) {
+                            estimatedPrice = 2000000; // Azuki
+                        }
+                        
+                        txList.push({
+                            date: date.toISOString().split('T')[0],
+                            type: type,
+                            currency: tx.tokenName || 'NFT',
+                            amount: 1, // NFTは通常1個
+                            price: estimatedPrice,
+                            totalJPY: estimatedPrice,
+                            fee: 0,
+                            nftCollection: tx.tokenName,
+                            tokenId: tx.tokenID,
+                            marketplace: marketplace || 'Unknown',
+                            hash: tx.hash
+                        });
+                    }
+                }
+                
                 progressEl.style.width = '100%';
                 statusEl.textContent = '完了！';
                 
@@ -1381,6 +1568,7 @@
         function showManualInput() {
             manualModal.style.display = 'block';
             document.getElementById('manualDate').value = new Date().toISOString().split('T')[0];
+            updateManualFormFields(); // フォームフィールドを初期化
         }
         
         function hideManualInput() {
@@ -1392,17 +1580,29 @@
         function addManualTransaction(event) {
             event.preventDefault();
             
-            const formData = new FormData(event.target);
+            const type = document.getElementById('manualType').value;
+            const currency = document.getElementById('manualCurrency').value.toUpperCase();
+            const amount = parseFloat(document.getElementById('manualAmount').value);
+            const price = parseFloat(document.getElementById('manualPrice').value);
+            const fee = parseFloat(document.getElementById('manualFee').value) || 0;
+            
             const transaction = {
                 date: document.getElementById('manualDate').value,
-                type: document.getElementById('manualType').value,
-                currency: document.getElementById('manualCurrency').value.toUpperCase(),
-                amount: parseFloat(document.getElementById('manualAmount').value),
-                price: parseFloat(document.getElementById('manualPrice').value),
-                totalJPY: parseFloat(document.getElementById('manualAmount').value) * parseFloat(document.getElementById('manualPrice').value),
-                fee: parseFloat(document.getElementById('manualFee').value) || 0,
+                type: type,
+                currency: currency,
+                amount: amount,
+                price: price,
+                totalJPY: amount * price,
+                fee: fee,
                 hash: 'MANUAL-' + Date.now()
             };
+            
+            // NFT取引の場合は追加情報を含める
+            if (type.startsWith('nft-')) {
+                transaction.nftCollection = document.getElementById('nftCollection').value || currency;
+                transaction.tokenId = document.getElementById('tokenId').value || amount.toString();
+                transaction.marketplace = 'Manual Entry';
+            }
             
             transactions.push(transaction);
             transactions.sort((a, b) => new Date(b.date) - new Date(a.date));
@@ -1481,15 +1681,15 @@
                     </div>
                     <div class="tx-details">
                         <div class="tx-detail-item">
-                            <span class="tx-detail-label">通貨</span>
+                            <span class="tx-detail-label">${tx.type.startsWith('nft-') ? 'コレクション' : '通貨'}</span>
                             <span class="tx-detail-value">${tx.currency}</span>
                         </div>
                         <div class="tx-detail-item">
-                            <span class="tx-detail-label">数量</span>
-                            <span class="tx-detail-value">${tx.amount.toFixed(8)}</span>
+                            <span class="tx-detail-label">${tx.type.startsWith('nft-') ? 'トークンID' : '数量'}</span>
+                            <span class="tx-detail-value">${tx.type.startsWith('nft-') ? (tx.tokenId || tx.amount) : tx.amount.toFixed(8)}</span>
                         </div>
                         <div class="tx-detail-item">
-                            <span class="tx-detail-label">単価</span>
+                            <span class="tx-detail-label">価格</span>
                             <span class="tx-detail-value">¥${tx.price.toLocaleString()}</span>
                         </div>
                         <div class="tx-detail-item">
@@ -1500,6 +1700,12 @@
                         <div class="tx-detail-item">
                             <span class="tx-detail-label">手数料</span>
                             <span class="tx-detail-value">¥${tx.fee.toLocaleString()}</span>
+                        </div>
+                        ` : ''}
+                        ${tx.marketplace ? `
+                        <div class="tx-detail-item">
+                            <span class="tx-detail-label">マーケットプレイス</span>
+                            <span class="tx-detail-value">${tx.marketplace}</span>
                         </div>
                         ` : ''}
                         ${tx.protocol ? `
@@ -1520,10 +1726,14 @@
                 ['defi', 'staking'].includes(tx.type)
             );
             const stakingTxs = transactions.filter(tx => tx.type === 'staking');
+            const nftTxs = transactions.filter(tx => 
+                tx.type.startsWith('nft-')
+            );
             
             document.getElementById('totalTxCount').textContent = transactions.length;
             document.getElementById('currencyCount').textContent = currencies.length;
             document.getElementById('defiTxCount').textContent = defiTxs.length;
+            document.getElementById('nftTxCount').textContent = nftTxs.length;
             document.getElementById('stakingTxCount').textContent = stakingTxs.length;
         }
         
@@ -1541,6 +1751,7 @@
             const taxRate = parseFloat(document.getElementById('taxRate').value) / 100;
             const includeDefi = document.getElementById('includeDefi').checked;
             const includeStaking = document.getElementById('includeStaking').checked;
+            const includeNft = document.getElementById('includeNft').checked;
             
             // 年度でフィルター
             let yearTransactions = transactions.filter(tx => 
@@ -1559,13 +1770,18 @@
             if (!includeStaking) {
                 yearTransactions = yearTransactions.filter(tx => tx.type !== 'staking');
             }
+            if (!includeNft) {
+                yearTransactions = yearTransactions.filter(tx => !tx.type.startsWith('nft-'));
+            }
             
             // 税金計算ロジック
             let totalProfit = 0;
             let totalLoss = 0;
             let totalFees = 0;
             let defiIncome = 0;
+            let nftIncome = 0;
             const holdings = {};
+            const nftHoldings = {}; // NFT専用の保有情報
             
             // 日付順にソート
             yearTransactions.sort((a, b) => new Date(a.date) - new Date(b.date));
@@ -1576,7 +1792,41 @@
                     totalFees += tx.fee;
                 }
                 
-                // 収益の分類
+                // NFT取引の処理
+                if (tx.type.startsWith('nft-')) {
+                    if (tx.type === 'nft-buy' || tx.type === 'nft-mint') {
+                        // NFT購入・ミント
+                        const nftKey = `${tx.nftCollection || tx.currency}-${tx.tokenId || tx.amount}`;
+                        nftHoldings[nftKey] = {
+                            collection: tx.nftCollection || tx.currency,
+                            tokenId: tx.tokenId || tx.amount,
+                            cost: tx.totalJPY,
+                            acquiredDate: tx.date
+                        };
+                    } else if (tx.type === 'nft-sell') {
+                        // NFT売却
+                        const nftKey = `${tx.nftCollection || tx.currency}-${tx.tokenId || tx.amount}`;
+                        const holding = nftHoldings[nftKey];
+                        
+                        if (holding) {
+                            const profit = tx.totalJPY - holding.cost;
+                            if (profit > 0) {
+                                totalProfit += profit;
+                                nftIncome += profit;
+                            } else {
+                                totalLoss += Math.abs(profit);
+                            }
+                            delete nftHoldings[nftKey];
+                        } else {
+                            // 取得価額不明の場合は全額利益として計上
+                            totalProfit += tx.totalJPY;
+                            nftIncome += tx.totalJPY;
+                        }
+                    }
+                    return; // NFT取引はここで処理完了
+                }
+                
+                // 従来の暗号通貨取引処理
                 if (tx.type === 'defi' || tx.type === 'staking') {
                     defiIncome += tx.totalJPY;
                 }
@@ -1623,6 +1873,8 @@
             document.getElementById('totalLoss').textContent = formatCurrency(totalLoss);
             document.getElementById('netProfit').textContent = formatCurrency(netProfit);
             document.getElementById('estimatedTax').textContent = formatCurrency(estimatedTax);
+            document.getElementById('defiIncome').textContent = formatCurrency(defiIncome);
+            document.getElementById('nftIncome').textContent = formatCurrency(nftIncome);
             
             resultsSection.style.display = 'block';
             resultsSection.scrollIntoView({ behavior: 'smooth' });
@@ -1637,7 +1889,7 @@
             const taxRate = document.getElementById('taxRate').value;
             
             let csv = '\ufeff'; // BOM
-            csv += '暗号資産税金計算レポート\n\n';
+            csv += '暗号資産・NFT税金計算レポート\n\n';
             csv += `計算日,${new Date().toLocaleDateString('ja-JP')}\n`;
             csv += `対象年度,${year}年\n`;
             csv += `計算方法,${method === 'average' ? '移動平均法' : '先入先出法'}\n`;
@@ -1646,18 +1898,20 @@
             csv += '計算結果\n';
             csv += `売買利益,${document.getElementById('totalProfit').textContent}\n`;
             csv += `売買損失,${document.getElementById('totalLoss').textContent}\n`;
+            csv += `DeFi/ステーキング収益,${document.getElementById('defiIncome').textContent}\n`;
+            csv += `NFT売買損益,${document.getElementById('nftIncome').textContent}\n`;
             csv += `純利益,${document.getElementById('netProfit').textContent}\n`;
             csv += `推定税額,${document.getElementById('estimatedTax').textContent}\n\n`;
             
             csv += '取引履歴\n';
-            csv += '日付,取引タイプ,通貨,数量,単価,合計,手数料,ハッシュ\n';
+            csv += '日付,取引タイプ,通貨/コレクション,数量/トークンID,単価,合計,手数料,NFTコレクション,トークンID,マーケットプレイス,ハッシュ\n';
             
             const yearTx = transactions.filter(tx => tx.date.startsWith(year));
             yearTx.forEach(tx => {
-                csv += `${tx.date},${tx.type},${tx.currency},${tx.amount},${tx.price},${tx.totalJPY},${tx.fee || 0},${tx.hash || ''}\n`;
+                csv += `${tx.date},${tx.type},${tx.currency},${tx.amount},${tx.price},${tx.totalJPY},${tx.fee || 0},"${tx.nftCollection || ''}","${tx.tokenId || ''}","${tx.marketplace || ''}","${tx.hash || ''}"\n`;
             });
             
-            downloadCSV(csv, `tax_report_${year}_${new Date().toISOString().split('T')[0]}.csv`);
+            downloadCSV(csv, `crypto_nft_tax_report_${year}_${new Date().toISOString().split('T')[0]}.csv`);
             showMessage('計算結果をエクスポートしました', 'success');
         }
         
@@ -1697,7 +1951,11 @@
                 'transfer-in': '入金',
                 'transfer-out': '出金',
                 'staking': 'ステーキング',
-                'defi': 'DeFi'
+                'defi': 'DeFi',
+                'nft-buy': 'NFT購入',
+                'nft-sell': 'NFT売却',
+                'nft-mint': 'NFTミント',
+                'nft-transfer': 'NFT転送'
             };
             return labels[type] || type;
         }
@@ -1727,6 +1985,7 @@
         document.addEventListener('DOMContentLoaded', () => {
             displayTransactions();
             updateStats();
+            updateManualFormFields(); // 手動入力フォームの初期化
             
             // 保存されたAPIキーを読み込み
             if (apiKeys.etherscan) {
