@@ -881,9 +881,34 @@
                     <button class="btn btn-secondary" id="disconnectBtn">切断</button>
                 </div>
                 
+                <div class="api-settings">
+                    <h3>🔑 API設定（実際のブロックチェーンデータ取得用）</h3>
+                    <div class="info-box">
+                        <p><strong>APIキーについて：</strong></p>
+                        <p>• <a href="https://etherscan.io/apis" target="_blank">Etherscan API</a>: Ethereum取引履歴を取得</p>
+                        <p>• <a href="https://docs.solscan.io/" target="_blank">Solscan API</a>: Solana取引履歴を取得</p>
+                        <p>• 無料プランで十分です</p>
+                    </div>
+                    <div class="form-group">
+                        <label for="etherscanApi">Etherscan API Key</label>
+                        <input type="text" id="etherscanApi" placeholder="Your Etherscan API Key">
+                    </div>
+                    <div class="form-group">
+                        <label for="solscanApi">Solscan API Key</label>
+                        <input type="text" id="solscanApi" placeholder="Your Solscan API Key">
+                    </div>
+                    <button class="btn" id="saveApiKeysBtn">APIキーを保存</button>
+                    <div style="margin-top: 10px;">
+                        <small id="apiStatus">APIキーが保存されていません</small>
+                    </div>
+                </div>
+                
                 <div class="loading" id="loadingIndicator">
                     <div class="spinner"></div>
-                    <p>処理中...</p>
+                    <p id="loadingText">処理中...</p>
+                    <div id="fetchProgress" style="width: 100%; height: 8px; background: #ddd; border-radius: 4px; margin-top: 10px; display: none;">
+                        <div id="progressBar" style="height: 100%; background: #2196F3; width: 0%; border-radius: 4px; transition: width 0.3s ease;"></div>
+                    </div>
                 </div>
             </div>
 
@@ -1103,6 +1128,10 @@
         let currentPrices = {};
         let holdings = {};
         let nftHoldings = {};
+        let apiKeys = {
+            etherscan: localStorage.getItem('etherscanApiKey') || '',
+            solscan: localStorage.getItem('solscanApiKey') || ''
+        };
         
         // 現在価格（デモ用）
         const DEFAULT_PRICES = {
@@ -1295,6 +1324,10 @@
         const manualTypeSelect = document.getElementById('manualType');
         const nftFields = document.getElementById('nftFields');
         const nftTokenId = document.getElementById('nftTokenId');
+        const saveApiKeysBtn = document.getElementById('saveApiKeysBtn');
+        const etherscanApiInput = document.getElementById('etherscanApi');
+        const solscanApiInput = document.getElementById('solscanApi');
+        const apiStatus = document.getElementById('apiStatus');
         
         // イベントリスナーの設定
         connectMetaMaskBtn.addEventListener('click', connectMetaMask);
@@ -1311,6 +1344,7 @@
         exportResultsBtn.addEventListener('click', exportResultsCSV);
         printResultsBtn.addEventListener('click', () => window.print());
         manualTypeSelect.addEventListener('change', updateManualFormFields);
+        saveApiKeysBtn.addEventListener('click', saveApiKeys);
         
         // タブ切り替え
         function switchTab(tabName) {
@@ -1612,6 +1646,7 @@
                 });
                 
                 walletAddress = accounts[0];
+                connectedWallet = { type: 'MetaMask', address: walletAddress };
                 updateWalletUI(true, 'MetaMask', walletAddress);
                 showMessage('MetaMaskが正常に接続されました', 'success');
                 
@@ -1649,6 +1684,7 @@
                 
                 const resp = await provider.connect();
                 walletAddress = resp.publicKey.toString();
+                connectedWallet = { type: 'Phantom', address: walletAddress };
                 updateWalletUI(true, 'Phantom', walletAddress);
                 showMessage('Phantomが正常に接続されました', 'success');
                 
@@ -1680,6 +1716,32 @@
             calculateHoldings();
             showMessage(`${type}が接続されました（デモモード）`, 'success');
             showLoading(false);
+        }
+        
+        // APIキー保存
+        function saveApiKeys() {
+            apiKeys.etherscan = etherscanApiInput.value.trim();
+            apiKeys.solscan = solscanApiInput.value.trim();
+            
+            localStorage.setItem('etherscanApiKey', apiKeys.etherscan);
+            localStorage.setItem('solscanApiKey', apiKeys.solscan);
+            
+            updateApiStatus();
+            showMessage('APIキーを保存しました', 'success');
+        }
+        
+        // APIステータス更新
+        function updateApiStatus() {
+            const hasEtherscan = apiKeys.etherscan.length > 0;
+            const hasSolscan = apiKeys.solscan.length > 0;
+            
+            if (hasEtherscan || hasSolscan) {
+                apiStatus.textContent = `保存済み: ${hasEtherscan ? 'Etherscan' : ''}${hasEtherscan && hasSolscan ? ', ' : ''}${hasSolscan ? 'Solscan' : ''}`;
+                apiStatus.style.color = '#4CAF50';
+            } else {
+                apiStatus.textContent = 'APIキーが保存されていません';
+                apiStatus.style.color = '#f44336';
+            }
         }
         
         // 取引履歴取得
@@ -1719,13 +1781,280 @@
                     displayTransactions();
                     calculateHoldings();
                     showMessage('追加の取引データを取得しました（デモモード）', 'success');
+                    return;
+                }
+                
+                // 実際のブロックチェーンから取引履歴を取得
+                if (connectedWallet.type === 'MetaMask') {
+                    if (!apiKeys.etherscan) {
+                        showMessage('Etherscan APIキーを設定してください。APIキーは https://etherscan.io/apis から無料で取得できます。', 'warning');
+                        return;
+                    }
+                    await fetchEthereumTransactions(walletAddress);
+                } else if (connectedWallet.type === 'Phantom') {
+                    await fetchSolanaTransactions(walletAddress);
+                }
+                
+                updateStats();
+                displayTransactions();
+                calculateHoldings();
+                
+                if (transactions.length > 0) {
+                    showMessage(`${transactions.length}件の取引を取得しました`, 'success');
+                } else {
+                    showMessage('取引履歴が見つかりませんでした。このウォレットに取引履歴がない可能性があります。', 'warning');
                 }
                 
             } catch (error) {
                 showMessage('取引履歴の取得に失敗しました: ' + error.message, 'error');
+                console.error('Fetch error:', error);
+                
+                // APIキーのエラーの場合は追加のヘルプを表示
+                if (error.message.includes('Invalid API Key') || error.message.includes('403')) {
+                    showMessage('APIキーが無効です。正しいAPIキーを設定してください。', 'error');
+                }
             } finally {
                 showLoading(false);
             }
+        }
+        
+        // Ethereum取引履歴取得
+        async function fetchEthereumTransactions(address) {
+            const txList = [];
+            const loadingText = document.getElementById('loadingText');
+            const fetchProgress = document.getElementById('fetchProgress');
+            const progressBar = document.getElementById('progressBar');
+            
+            try {
+                fetchProgress.style.display = 'block';
+                progressBar.style.width = '10%';
+                loadingText.textContent = 'Ethereum取引履歴を取得中...';
+                
+                // 通常のETH取引
+                const txUrl = `https://api.etherscan.io/api?module=account&action=txlist&address=${address}&startblock=0&endblock=99999999&sort=desc&apikey=${apiKeys.etherscan}`;
+                const txResponse = await fetch(txUrl);
+                const txData = await txResponse.json();
+                
+                progressBar.style.width = '40%';
+                
+                if (txData.status === '1' && txData.result) {
+                    loadingText.textContent = `${txData.result.length}件のETH取引を処理中...`;
+                    
+                    for (const tx of txData.result.slice(0, 50)) { // 最新50件
+                        if (parseFloat(tx.value) > 0) {
+                            const date = new Date(tx.timeStamp * 1000);
+                            const value = parseFloat(tx.value) / 1e18;
+                            const type = tx.from.toLowerCase() === address.toLowerCase() ? 'transfer-out' : 'transfer-in';
+                            
+                            txList.push({
+                                date: date.toISOString().split('T')[0],
+                                type: type,
+                                currency: 'ETH',
+                                amount: value,
+                                price: 380000, // 現在価格（本来はAPIで取得）
+                                totalJPY: value * 380000,
+                                fee: (parseFloat(tx.gasUsed) * parseFloat(tx.gasPrice) / 1e18) * 380000,
+                                hash: tx.hash
+                            });
+                        }
+                    }
+                } else if (txData.message && txData.message.includes('NOTOK')) {
+                    throw new Error('Etherscan API エラー: ' + (txData.result || 'APIキーが無効です'));
+                }
+                
+                progressBar.style.width = '60%';
+                loadingText.textContent = 'ERC20トークン取引を取得中...';
+                
+                // ERC20トークン取引
+                const tokenUrl = `https://api.etherscan.io/api?module=account&action=tokentx&address=${address}&startblock=0&endblock=99999999&sort=desc&apikey=${apiKeys.etherscan}`;
+                const tokenResponse = await fetch(tokenUrl);
+                const tokenData = await tokenResponse.json();
+                
+                progressBar.style.width = '80%';
+                
+                if (tokenData.status === '1' && tokenData.result) {
+                    loadingText.textContent = `${tokenData.result.length}件のトークン取引を処理中...`;
+                    
+                    for (const tx of tokenData.result.slice(0, 50)) { // 最新50件
+                        const decimals = parseInt(tx.tokenDecimal);
+                        const value = parseFloat(tx.value) / Math.pow(10, decimals);
+                        
+                        if (value > 0) {
+                            const date = new Date(tx.timeStamp * 1000);
+                            const type = tx.from.toLowerCase() === address.toLowerCase() ? 'transfer-out' : 'transfer-in';
+                            
+                            // ステーキング報酬の検出
+                            const isStaking = tx.tokenSymbol.toLowerCase().includes('st') || 
+                                            tx.from === '0x0000000000000000000000000000000000000000';
+                            
+                            txList.push({
+                                date: date.toISOString().split('T')[0],
+                                type: isStaking ? 'staking' : type,
+                                currency: tx.tokenSymbol,
+                                amount: value,
+                                price: DEFAULT_PRICES[tx.tokenSymbol] || 1000,
+                                totalJPY: value * (DEFAULT_PRICES[tx.tokenSymbol] || 1000),
+                                fee: 0,
+                                hash: tx.hash
+                            });
+                        }
+                    }
+                } else if (tokenData.message && tokenData.message.includes('NOTOK')) {
+                    console.warn('ERC20トークン取引の取得に失敗:', tokenData.result);
+                }
+                
+                progressBar.style.width = '90%';
+                loadingText.textContent = 'NFT取引を取得中...';
+                
+                // NFT取引
+                const nftUrl = `https://api.etherscan.io/api?module=account&action=tokennfttx&address=${address}&startblock=0&endblock=99999999&sort=desc&apikey=${apiKeys.etherscan}`;
+                const nftResponse = await fetch(nftUrl);
+                const nftData = await nftResponse.json();
+                
+                if (nftData.status === '1' && nftData.result) {
+                    for (const tx of nftData.result.slice(0, 30)) { // 最新30件
+                        const date = new Date(tx.timeStamp * 1000);
+                        const isReceiving = tx.to.toLowerCase() === address.toLowerCase();
+                        const isSending = tx.from.toLowerCase() === address.toLowerCase();
+                        
+                        let type = 'nft-transfer';
+                        if (tx.from === '0x0000000000000000000000000000000000000000') {
+                            type = 'nft-mint';
+                        } else if (isReceiving) {
+                            type = 'nft-buy';
+                        } else if (isSending) {
+                            type = 'nft-sell';
+                        }
+                        
+                        txList.push({
+                            date: date.toISOString().split('T')[0],
+                            type: type,
+                            currency: tx.tokenName || 'NFT',
+                            amount: 1,
+                            price: 1000000, // デフォルト価格
+                            totalJPY: 1000000,
+                            fee: 0,
+                            nftCollection: tx.tokenName,
+                            tokenId: tx.tokenID,
+                            marketplace: 'Unknown',
+                            hash: tx.hash
+                        });
+                    }
+                }
+                
+                progressBar.style.width = '100%';
+                loadingText.textContent = '完了！';
+                
+            } catch (error) {
+                console.error('Ethereum fetch error:', error);
+                throw new Error('Ethereum取引履歴の取得に失敗しました: ' + error.message);
+            } finally {
+                setTimeout(() => {
+                    fetchProgress.style.display = 'none';
+                    loadingText.textContent = '処理中...';
+                }, 1000);
+            }
+            
+            transactions = txList;
+        }
+        
+        // Solana取引履歴取得
+        async function fetchSolanaTransactions(address) {
+            const txList = [];
+            const loadingText = document.getElementById('loadingText');
+            const fetchProgress = document.getElementById('fetchProgress');
+            const progressBar = document.getElementById('progressBar');
+            
+            try {
+                fetchProgress.style.display = 'block';
+                progressBar.style.width = '10%';
+                
+                if (apiKeys.solscan) {
+                    loadingText.textContent = 'Solana取引履歴を取得中...';
+                    
+                    // Solscan APIを使用
+                    const headers = {
+                        'Accept': 'application/json',
+                        'token': apiKeys.solscan
+                    };
+                    
+                    const txUrl = `https://public-api.solscan.io/account/transactions?account=${address}&limit=100`;
+                    const txResponse = await fetch(txUrl, { headers });
+                    
+                    progressBar.style.width = '60%';
+                    
+                    if (txResponse.ok) {
+                        const txData = await txResponse.json();
+                        
+                        if (txData && txData.data) {
+                            loadingText.textContent = `${txData.data.length}件のSOL取引を処理中...`;
+                            progressBar.style.width = '80%';
+                            
+                            for (const tx of txData.data) {
+                                const date = new Date(tx.blockTime * 1000);
+                                
+                                // SOL取引
+                                if (tx.solTransfers && tx.solTransfers.length > 0) {
+                                    for (const transfer of tx.solTransfers) {
+                                        const isReceiving = transfer.destination === address;
+                                        const amount = parseFloat(transfer.amount) / 1e9;
+                                        
+                                        if (amount > 0) {
+                                            const isStaking = isReceiving && amount < 0.1;
+                                            
+                                            txList.push({
+                                                date: date.toISOString().split('T')[0],
+                                                type: isStaking ? 'staking' : (isReceiving ? 'transfer-in' : 'transfer-out'),
+                                                currency: 'SOL',
+                                                amount: amount,
+                                                price: 22000,
+                                                totalJPY: amount * 22000,
+                                                fee: (tx.fee || 0) / 1e9 * 22000,
+                                                protocol: isStaking ? 'Solana Staking' : null,
+                                                hash: tx.txHash
+                                            });
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                } else {
+                    // Solscan APIキーがない場合は簡易的なデモデータ
+                    loadingText.textContent = 'Solscan APIキーが未設定のため、デモデータを使用します...';
+                    progressBar.style.width = '50%';
+                    
+                    showMessage('Solscan APIキーを設定すると、詳細な取引履歴を取得できます', 'info');
+                    
+                    const sampleSolanaTx = [
+                        {
+                            date: '2025-01-20',
+                            type: 'transfer-in',
+                            currency: 'SOL',
+                            amount: 2.5,
+                            price: 22000,
+                            totalJPY: 55000,
+                            fee: 0.000005 * 22000,
+                            hash: Math.random().toString(36).substr(2, 44)
+                        }
+                    ];
+                    txList.push(...sampleSolanaTx);
+                }
+                
+                progressBar.style.width = '100%';
+                loadingText.textContent = '完了！';
+                
+            } catch (error) {
+                console.error('Solana fetch error:', error);
+                throw new Error('Solana取引履歴の取得に失敗しました: ' + error.message);
+            } finally {
+                setTimeout(() => {
+                    fetchProgress.style.display = 'none';
+                    loadingText.textContent = '処理中...';
+                }, 1000);
+            }
+            
+            transactions = txList;
         }
         
         // ウォレット接続状態の更新
@@ -2163,6 +2492,15 @@
             updateStats();
             updateManualFormFields();
             updatePortfolioDisplay();
+            
+            // 保存されたAPIキーを読み込み
+            if (apiKeys.etherscan) {
+                etherscanApiInput.value = apiKeys.etherscan;
+            }
+            if (apiKeys.solscan) {
+                solscanApiInput.value = apiKeys.solscan;
+            }
+            updateApiStatus();
         });
     </script>
 </body>
