@@ -277,12 +277,13 @@
             text-align: center;
             transition: all 0.3s ease;
             border: 2px solid transparent;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
         }
 
         .nft-card:hover {
             border-color: #ab9ff2;
             transform: translateY(-5px);
-            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+            box-shadow: 0 5px 20px rgba(0, 0, 0, 0.15);
         }
 
         .nft-image {
@@ -301,6 +302,10 @@
         .nft-name {
             font-weight: 600;
             margin-bottom: 5px;
+            font-size: 0.95em;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
         }
 
         .nft-token-id {
@@ -312,6 +317,7 @@
         .nft-value {
             font-weight: 700;
             color: #2a5298;
+            font-size: 1.1em;
         }
 
         /* 既存のスタイル */
@@ -1384,16 +1390,22 @@
                     const nftKey = `${tx.nftCollection || tx.currency}-${tx.tokenId || tx.amount}`;
                     
                     if (tx.type === 'nft-buy' || tx.type === 'nft-mint') {
+                        // NFT購入・ミント
                         nftHoldings[nftKey] = {
                             collection: tx.nftCollection || tx.currency,
                             tokenId: tx.tokenId || tx.amount,
                             acquiredDate: tx.date,
                             acquiredPrice: tx.totalJPY,
-                            currentPrice: tx.totalJPY * 1.1, // デモ用：10%上昇と仮定
-                            marketplace: tx.marketplace
+                            currentPrice: tx.totalJPY * (0.9 + Math.random() * 0.3), // デモ用：-10%〜+20%の変動
+                            marketplace: tx.marketplace || 'Unknown',
+                            contractAddress: tx.contractAddress || null
                         };
-                    } else if (tx.type === 'nft-sell' || tx.type === 'nft-transfer') {
+                    } else if (tx.type === 'nft-sell') {
+                        // NFT売却
                         delete nftHoldings[nftKey];
+                    } else if (tx.type === 'nft-transfer' && tx.currency !== 'Unknown NFT') {
+                        // 転送の場合、送信側なら削除、受信側なら追加
+                        // ここでは簡略化のため、転送は無視（実際にはより詳細な判定が必要）
                     }
                 } else {
                     // 仮想通貨取引の処理
@@ -1541,14 +1553,49 @@
                 }).join('');
                 
                 // NFTギャラリー
-                nftGallery.innerHTML = Object.entries(nftHoldings).map(([key, nft]) => `
-                    <div class="nft-card">
-                        <div class="nft-image">🎨</div>
-                        <div class="nft-name">${nft.collection}</div>
-                        <div class="nft-token-id">#${nft.tokenId}</div>
-                        <div class="nft-value">¥${nft.currentPrice.toLocaleString()}</div>
-                    </div>
-                `).join('');
+                nftGallery.innerHTML = Object.entries(nftHoldings).map(([key, nft]) => {
+                    // NFTコレクションに応じたアイコンを選択
+                    let icon = '🎨';
+                    const collectionLower = nft.collection.toLowerCase();
+                    if (collectionLower.includes('punk')) {
+                        icon = '👾';
+                    } else if (collectionLower.includes('ape') || collectionLower.includes('bayc')) {
+                        icon = '🐵';
+                    } else if (collectionLower.includes('azuki')) {
+                        icon = '⛩️';
+                    } else if (collectionLower.includes('doodle')) {
+                        icon = '✏️';
+                    } else if (collectionLower.includes('cool cat')) {
+                        icon = '😺';
+                    } else if (collectionLower.includes('world of women')) {
+                        icon = '👩';
+                    } else if (collectionLower.includes('clone')) {
+                        icon = '🧬';
+                    } else if (collectionLower.includes('moonbird')) {
+                        icon = '🦉';
+                    } else if (collectionLower.includes('degods')) {
+                        icon = '👹';
+                    } else if (collectionLower.includes('okay bear')) {
+                        icon = '🐻';
+                    } else if (collectionLower.includes('solana monkey')) {
+                        icon = '🐒';
+                    }
+                    
+                    return `
+                        <div class="nft-card">
+                            <div class="nft-image">${icon}</div>
+                            <div class="nft-name">${nft.collection}</div>
+                            <div class="nft-token-id">#${nft.tokenId}</div>
+                            <div class="nft-value">¥${nft.currentPrice.toLocaleString()}</div>
+                            <div style="font-size: 0.8em; color: #666; margin-top: 5px;">
+                                取得: ${formatDate(nft.acquiredDate)}
+                            </div>
+                            ${nft.marketplace ? `<div style="font-size: 0.75em; color: #999; margin-top: 3px;">
+                                via ${nft.marketplace}
+                            </div>` : ''}
+                        </div>
+                    `;
+                }).join('');
             }
             
             // 合計資産価値の更新
@@ -1571,7 +1618,8 @@
             
             Object.keys(nftHoldings).forEach(key => {
                 const nft = nftHoldings[key];
-                nft.currentPrice = nft.acquiredPrice * (0.8 + Math.random() * 0.4); // ±20%の変動
+                // NFTの価格変動は大きめに設定（-30%〜+50%）
+                nft.currentPrice = nft.acquiredPrice * (0.7 + Math.random() * 0.8);
             });
             
             updatePortfolioDisplay();
@@ -1906,39 +1954,144 @@
                 progressBar.style.width = '90%';
                 loadingText.textContent = 'NFT取引を取得中...';
                 
-                // NFT取引
-                const nftUrl = `https://api.etherscan.io/api?module=account&action=tokennfttx&address=${address}&startblock=0&endblock=99999999&sort=desc&apikey=${apiKeys.etherscan}`;
-                const nftResponse = await fetch(nftUrl);
-                const nftData = await nftResponse.json();
+                // ERC721 NFT取引
+                const nft721Url = `https://api.etherscan.io/api?module=account&action=tokennfttx&address=${address}&startblock=0&endblock=99999999&sort=desc&apikey=${apiKeys.etherscan}`;
+                const nft721Response = await fetch(nft721Url);
+                const nft721Data = await nft721Response.json();
                 
-                if (nftData.status === '1' && nftData.result) {
-                    for (const tx of nftData.result.slice(0, 30)) { // 最新30件
+                // ERC1155 NFT取引
+                const nft1155Url = `https://api.etherscan.io/api?module=account&action=token1155tx&address=${address}&startblock=0&endblock=99999999&sort=desc&apikey=${apiKeys.etherscan}`;
+                const nft1155Response = await fetch(nft1155Url);
+                const nft1155Data = await nft1155Response.json();
+                
+                // 両方のNFTデータを結合
+                const allNftData = [];
+                if (nft721Data.status === '1' && nft721Data.result) {
+                    allNftData.push(...nft721Data.result.map(tx => ({...tx, tokenType: 'ERC721'})));
+                }
+                if (nft1155Data.status === '1' && nft1155Data.result) {
+                    allNftData.push(...nft1155Data.result.map(tx => ({...tx, tokenType: 'ERC1155'})));
+                }
+                
+                // 日付でソート
+                allNftData.sort((a, b) => b.timeStamp - a.timeStamp);
+                
+                if (allNftData.length > 0) {
+                    loadingText.textContent = `${allNftData.length}件のNFT取引を処理中...`;
+                    
+                    // NFTマーケットプレイスのアドレス
+                    const NFT_MARKETPLACES = {
+                        '0x7be8076f4ea4a4ad08075c2508e481d6c946d12b': 'OpenSea',
+                        '0x7f268357a8c2552623316e2562d90e642bb538e5': 'OpenSea V2',
+                        '0x00000000006c3852cbef3e08e8df289169ede581': 'OpenSea Seaport',
+                        '0x74312363e45dcaba76c59ec49a7aa8a65a67eed3': 'X2Y2',
+                        '0x59728544b08ab483533076417fbbb2fd0b17ce3a': 'LooksRare',
+                        '0xf849de01b080adc3a814fabe1e2087475cf2e354': 'X2Y2 V2',
+                        '0x2b2e8cda09bba9660dca5cb6233787738ad68329': 'Sudoswap'
+                    };
+                    
+                    for (const tx of allNftData.slice(0, 100)) { // 最新100件
                         const date = new Date(tx.timeStamp * 1000);
                         const isReceiving = tx.to.toLowerCase() === address.toLowerCase();
                         const isSending = tx.from.toLowerCase() === address.toLowerCase();
+                        const isFromZeroAddress = tx.from === '0x0000000000000000000000000000000000000000';
+                        const isToZeroAddress = tx.to === '0x0000000000000000000000000000000000000000';
                         
                         let type = 'nft-transfer';
-                        if (tx.from === '0x0000000000000000000000000000000000000000') {
+                        let marketplace = 'Direct Transfer';
+                        let estimatedPrice = 0;
+                        
+                        // マーケットプレイス経由の取引を検出
+                        Object.entries(NFT_MARKETPLACES).forEach(([addr, name]) => {
+                            if (tx.to.toLowerCase() === addr.toLowerCase() || 
+                                tx.from.toLowerCase() === addr.toLowerCase()) {
+                                marketplace = name;
+                            }
+                        });
+                        
+                        // 取引タイプの判定
+                        if (isFromZeroAddress && isReceiving) {
                             type = 'nft-mint';
-                        } else if (isReceiving) {
+                            estimatedPrice = 300000; // ミント価格の推定
+                        } else if (isToZeroAddress && isSending) {
+                            type = 'nft-burn';
+                            estimatedPrice = 0;
+                        } else if (isReceiving && !isSending) {
                             type = 'nft-buy';
-                        } else if (isSending) {
+                            // コレクションによる価格推定
+                            if (tx.tokenName) {
+                                const tokenNameLower = tx.tokenName.toLowerCase();
+                                if (tokenNameLower.includes('punk')) {
+                                    estimatedPrice = 15000000;
+                                } else if (tokenNameLower.includes('ape') || 
+                                         tokenNameLower.includes('bayc')) {
+                                    estimatedPrice = 8000000;
+                                } else if (tokenNameLower.includes('azuki')) {
+                                    estimatedPrice = 3000000;
+                                } else if (tokenNameLower.includes('doodle')) {
+                                    estimatedPrice = 2000000;
+                                } else if (tokenNameLower.includes('cool cat')) {
+                                    estimatedPrice = 1500000;
+                                } else if (tokenNameLower.includes('clone')) {
+                                    estimatedPrice = 1200000;
+                                } else if (tokenNameLower.includes('moonbird')) {
+                                    estimatedPrice = 2500000;
+                                } else {
+                                    estimatedPrice = 500000; // その他のNFT
+                                }
+                            } else {
+                                estimatedPrice = 500000;
+                            }
+                        } else if (isSending && !isReceiving) {
                             type = 'nft-sell';
+                            // 売却の場合も同様の価格推定（少し高めに設定）
+                            if (tx.tokenName) {
+                                const tokenNameLower = tx.tokenName.toLowerCase();
+                                if (tokenNameLower.includes('punk')) {
+                                    estimatedPrice = 16000000;
+                                } else if (tokenNameLower.includes('ape') || 
+                                         tokenNameLower.includes('bayc')) {
+                                    estimatedPrice = 8500000;
+                                } else if (tokenNameLower.includes('azuki')) {
+                                    estimatedPrice = 3200000;
+                                } else if (tokenNameLower.includes('doodle')) {
+                                    estimatedPrice = 2100000;
+                                } else if (tokenNameLower.includes('cool cat')) {
+                                    estimatedPrice = 1600000;
+                                } else if (tokenNameLower.includes('clone')) {
+                                    estimatedPrice = 1300000;
+                                } else if (tokenNameLower.includes('moonbird')) {
+                                    estimatedPrice = 2600000;
+                                } else {
+                                    estimatedPrice = 520000;
+                                }
+                            } else {
+                                estimatedPrice = 520000;
+                            }
                         }
                         
-                        txList.push({
-                            date: date.toISOString().split('T')[0],
-                            type: type,
-                            currency: tx.tokenName || 'NFT',
-                            amount: 1,
-                            price: 1000000, // デフォルト価格
-                            totalJPY: 1000000,
-                            fee: 0,
-                            nftCollection: tx.tokenName,
-                            tokenId: tx.tokenID,
-                            marketplace: 'Unknown',
-                            hash: tx.hash
-                        });
+                        // バーンされたNFTとゼロ値の転送は除外
+                        if (type !== 'nft-burn' && (type !== 'nft-transfer' || marketplace !== 'Direct Transfer')) {
+                            // ERC1155の場合は数量を考慮
+                            const amount = tx.tokenType === 'ERC1155' && tx.tokenValue ? 
+                                parseInt(tx.tokenValue) : 1;
+                            
+                            txList.push({
+                                date: date.toISOString().split('T')[0],
+                                type: type,
+                                currency: tx.tokenName || 'Unknown NFT',
+                                amount: amount,
+                                price: estimatedPrice,
+                                totalJPY: estimatedPrice * amount,
+                                fee: type === 'nft-mint' ? 20000 : (marketplace !== 'Direct Transfer' ? 50000 : 0),
+                                nftCollection: tx.tokenName || 'Unknown Collection',
+                                tokenId: tx.tokenID || 'Unknown',
+                                tokenType: tx.tokenType,
+                                marketplace: marketplace,
+                                contractAddress: tx.contractAddress,
+                                hash: tx.hash
+                            });
+                        }
                     }
                 }
                 
@@ -1955,7 +2108,14 @@
                 }, 1000);
             }
             
+            // 取引履歴をセットして表示を更新
             transactions = txList;
+            
+            // 日付でソート（新しい順）
+            transactions.sort((a, b) => new Date(b.date) - new Date(a.date));
+            
+            console.log(`取得した取引数: ${transactions.length}`);
+            console.log('NFT取引:', transactions.filter(tx => tx.type.startsWith('nft-')));
         }
         
         // Solana取引履歴取得
